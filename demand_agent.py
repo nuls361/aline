@@ -30,13 +30,19 @@ TITLE_KEYWORDS = [
     "interim", "fractional", "managing director", "general manager", "c-level"
 ]
 
+DACH_KEYWORDS = [
+    "germany", "deutschland", "austria", "österreich", "switzerland", "schweiz",
+    "berlin", "munich", "münchen", "hamburg", "frankfurt", "vienna", "wien",
+    "zurich", "zürich", "dach", "remote"
+]
+
 SESSION = requests.Session()
 SESSION.headers.update({"User-Agent": "Aline-Demand-Agent/1.0"})
 
 # --- ATS Fetchers ---
 
 def fetch_ashby(slug: str) -> list[dict]:
-    """Ashby public job board API."""
+    """Ashby public job board API — response has 'jobPostings' with 'title', 'locationName', 'jobUrl'."""
     url = f"https://api.ashbyhq.com/posting-public/job-board/{slug}"
     try:
         resp = SESSION.get(url, timeout=10)
@@ -45,13 +51,15 @@ def fetch_ashby(slug: str) -> list[dict]:
         resp.raise_for_status()
         data = resp.json()
         results = []
-        for job in data.get("jobs", []):
+        for job in data.get("jobPostings", data.get("jobs", [])):
             title = job.get("title", "")
             if not matches_title(title):
                 continue
-            location = job.get("location", "")
+            location = job.get("locationName", job.get("location", ""))
             if isinstance(location, dict):
                 location = location.get("name", "")
+            if not matches_location(location):
+                continue
             results.append({
                 "company": slug,
                 "title": title,
@@ -67,7 +75,7 @@ def fetch_ashby(slug: str) -> list[dict]:
 
 
 def fetch_greenhouse(slug: str) -> list[dict]:
-    """Greenhouse JSON API — returns jobs with title, location, URL."""
+    """Greenhouse JSON API — response has 'jobs' with 'title', 'location.name', 'absolute_url'."""
     url = f"https://boards-api.greenhouse.io/v1/boards/{slug}/jobs"
     try:
         resp = SESSION.get(url, timeout=10)
@@ -80,7 +88,10 @@ def fetch_greenhouse(slug: str) -> list[dict]:
             title = job.get("title", "")
             if not matches_title(title):
                 continue
-            location = job.get("location", {}).get("name", "") if isinstance(job.get("location"), dict) else ""
+            loc = job.get("location")
+            location = loc.get("name", "") if isinstance(loc, dict) else ""
+            if not matches_location(location):
+                continue
             job_url = job.get("absolute_url", "")
             updated = job.get("updated_at", "")
             posted_date = updated[:10] if updated else None
@@ -99,7 +110,7 @@ def fetch_greenhouse(slug: str) -> list[dict]:
 
 
 def fetch_lever(slug: str) -> list[dict]:
-    """Lever JSON API — returns postings with title, location, URL."""
+    """Lever JSON API — response is array with 'text' (title), 'categories.location', 'hostedUrl'."""
     url = f"https://api.lever.co/v0/postings/{slug}?mode=json"
     try:
         resp = SESSION.get(url, timeout=10)
@@ -114,7 +125,10 @@ def fetch_lever(slug: str) -> list[dict]:
             title = posting.get("text", "")
             if not matches_title(title):
                 continue
-            location = posting.get("categories", {}).get("location", "") if isinstance(posting.get("categories"), dict) else ""
+            cats = posting.get("categories")
+            location = cats.get("location", "") if isinstance(cats, dict) else ""
+            if not matches_location(location):
+                continue
             created_at = posting.get("createdAt")
             posted_date = None
             if created_at:
@@ -156,6 +170,8 @@ def fetch_workable(slug: str) -> list[dict]:
             if job.get("country"):
                 location_parts.append(job["country"])
             location = ", ".join(location_parts)
+            if not matches_location(location):
+                continue
             shortcode = job.get("shortcode", "")
             job_url = f"https://apply.workable.com/{slug}/j/{shortcode}/" if shortcode else ""
             results.append({
@@ -179,6 +195,12 @@ ATS_FETCHERS = [fetch_ashby, fetch_greenhouse, fetch_lever, fetch_workable]
 def matches_title(title: str) -> bool:
     lower = title.lower()
     return any(kw in lower for kw in TITLE_KEYWORDS)
+
+def matches_location(location: str) -> bool:
+    if not location:
+        return False
+    lower = location.lower()
+    return any(kw in lower for kw in DACH_KEYWORDS)
 
 # --- Deduplication ---
 

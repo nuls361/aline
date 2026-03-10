@@ -1,0 +1,12 @@
+*
+!.github/
+!.github/workflows/
+!.github/workflows/*.yml
+!.gitignore
+!attio_client.py
+!news_agent.py
+!seed_samples.py
+!sent_urls.json
+!setup_attio.py
+!skill.md
+!soul.md

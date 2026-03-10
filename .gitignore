@@ -10,3 +10,5 @@
 !setup_attio.py
 !skill.md
 !soul.md
+!demand_agent.py
+!demand_sent_urls.json

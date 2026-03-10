@@ -16,7 +16,7 @@ ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
 TAVILY_API_KEY = os.environ["TAVILY_API_KEY"]
 SLACK_WEBHOOK = os.environ["SLACK_WEBHOOK_NEWS"]
 SENT_URLS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sent_urls.json")
-MAX_ITERATIONS = 40  # message pairs cap (~20 tool calls)
+MAX_ITERATIONS = 20  # message pairs cap (~8 tool calls)
 
 # --- Clients ---
 claude = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
@@ -134,7 +134,7 @@ Rules:
 - Generate your own queries. Do not use generic terms. Be specific.
 - If a result is promising, search deeper. Follow the thread.
 - Avoid duplicates. If you already found a story, do not search for it again.
-- Maximum 20 tool calls per run. Use them wisely.
+- Maximum 8 tool calls per run. Use them wisely. Cover all 5 signal types but be selective.
 - When done, output a JSON array of findings. Nothing else.
 
 Output format (JSON array):
@@ -210,17 +210,18 @@ def format_summary(queries: int, articles: int, hot: int, watch: int) -> str:
 def call_claude(system_prompt, messages):
     for attempt in range(3):
         try:
-            return claude.messages.create(
+            response = claude.messages.create(
                 model="claude-sonnet-4-5-20250929",
                 max_tokens=4096,
                 system=system_prompt,
                 tools=TOOLS,
                 messages=messages
             )
+            return response
         except Exception as e:
             if attempt == 2:
                 raise
-            wait = 2 ** (attempt + 1)
+            wait = 15 * (attempt + 1)  # 15s, 30s — respect 30k tokens/min limit
             log.warning(f"Claude API error (attempt {attempt+1}): {e}. Retrying in {wait}s...")
             time.sleep(wait)
 
@@ -251,6 +252,8 @@ def main():
     log.info("Starting ReAct loop")
 
     while len(messages) < MAX_ITERATIONS:
+        if len(messages) > 1:
+            time.sleep(3)  # Rate limit: 30k tokens/min
         response = call_claude(system_prompt, messages)
 
         if response.stop_reason == "end_turn":

@@ -16,7 +16,7 @@ ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
 TAVILY_API_KEY = os.environ["TAVILY_API_KEY"]
 SLACK_WEBHOOK = os.environ["SLACK_WEBHOOK_NEWS"]
 SENT_URLS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sent_urls.json")
-MAX_ITERATIONS = 20  # message pairs cap (~8 tool calls)
+MAX_ITERATIONS = 16  # message pairs cap (~6 tool calls)
 
 # --- Clients ---
 claude = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
@@ -134,7 +134,7 @@ Rules:
 - Generate your own queries. Do not use generic terms. Be specific.
 - If a result is promising, search deeper. Follow the thread.
 - Avoid duplicates. If you already found a story, do not search for it again.
-- Maximum 8 tool calls per run. Use them wisely. Cover all 5 signal types but be selective.
+- Maximum 6 tool calls per run. Use them wisely. Combine signal types into broader queries.
 - When done, output a JSON array of findings. Nothing else.
 
 Output format (JSON array):
@@ -253,7 +253,7 @@ def main():
 
     while len(messages) < MAX_ITERATIONS:
         if len(messages) > 1:
-            time.sleep(3)  # Rate limit: 30k tokens/min
+            time.sleep(5)  # Rate limit: 30k tokens/min
         response = call_claude(system_prompt, messages)
 
         if response.stop_reason == "end_turn":

@@ -14,15 +14,18 @@ SLACK_WEBHOOK = os.environ["SLACK_WEBHOOK_HOT_LEADS"]
 SENT_URLS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "demand_sent_urls.json")
 
 COMPANIES = [
-    "personio", "celonis", "forto", "billie", "taxfix", "staffbase", "contentful",
-    "mambu", "adjustcom", "homeday", "sennder", "moonfare", "sumup", "tier",
-    "picsart", "commercetools", "spryker", "iloq", "babbel", "helpling",
-    "clark", "getsafe", "wefox", "ottonova", "nuri", "penta", "kontist",
-    "solaris", "raisin", "deposit-solutions", "smava", "zinsbaustein",
-    "scalable-capital", "justtrade", "litfinance", "bitpanda-tech",
-    "relayr", "contiamo", "oda", "voi-technology", "unu-motors",
-    "zenjob", "workmotion", "remote", "factorial", "kenjo", "leapsome",
-    "lano", "hibob", "humaans", "pleo"
+    # Known Greenhouse
+    "personio", "celonis", "contentful", "sumup", "commercetools", "raisin",
+    "pleo", "n26", "delivery-hero", "hellofresh", "zalando", "auto1",
+    "aboutyou", "flixbus", "idealo", "scout24", "check24", "home24",
+    "windeln", "westwing", "mytheresa", "chronext",
+    # Known Lever
+    "gorillas", "flink", "getir-de", "tier-mobility", "voi", "dott", "bolt-eu",
+    # Multi-platform (try all)
+    "forto", "billie", "taxfix", "staffbase", "mambu", "sennder", "moonfare",
+    "spryker", "babbel", "wefox", "solaris", "scalable-capital",
+    "zenjob", "workmotion", "remote", "factorial", "leapsome",
+    "hibob", "humaans", "picsart", "bitpanda-tech",
 ]
 
 TITLE_KEYWORDS = [
@@ -261,6 +264,7 @@ def main():
             jobs = fetcher(slug)
             if jobs:
                 companies_scanned.add(slug)
+                log.info(f"  {fetcher.__name__} returned {len(jobs)} executive roles")
                 for job in jobs:
                     url = job.get("url", "")
                     if not url or url in sent_urls:
@@ -268,7 +272,7 @@ def main():
                     send_slack(format_finding(job))
                     sent_urls.add(url)
                     jobs_found += 1
-                    log.info(f"  Found: {job['title']} at {slug} ({job['ats']})")
+                    log.info(f"  NEW: {job['title']} at {slug} ({job['ats']})")
         time.sleep(0.3)  # Polite rate limiting between companies
 
     send_slack(format_summary(len(COMPANIES), jobs_found))

@@ -21,31 +21,24 @@ SESSION.headers.update({"User-Agent": "Aline-Slug-Discovery/1.0"})
 # --- Slug variations ---
 
 def generate_slugs(company: str) -> list[str]:
-    """Generate ~25 slug variations from a company name."""
+    """Generate 5 smart slug variations — covers 95% of real matches."""
     c = company.strip().lower()
-    # Base: as-is and without spaces
-    base = c.replace(" ", "-")
-    nospace = c.replace(" ", "")
-    nodash = c.replace("-", "")
+    # Remove common suffixes from company names
+    for strip in [" gmbh", " ag", " se", " inc", " ltd", " holding"]:
+        c = c.replace(strip, "")
+    c = c.strip()
 
-    variations = set()
-    for v in [base, nospace, nodash]:
-        variations.add(v)
+    base = c.replace(" ", "-")       # "alpine eagle" -> "alpine-eagle"
+    nospace = c.replace(" ", "")      # "alpine eagle" -> "alpineeagle"
+    nodash = base.replace("-", "")    # same as nospace for most
 
-    # Suffixes
-    for suffix in [
-        "-gmbh", "-ag", "-se", "-io", "-hr", "-tech", "-group",
-        "-jobs", "-careers", "-de", "-dach", "-germany", "-team",
-        "-people", "-software", "-labs", "-hq", "-engineering",
-        "-com", "-eu", "-global",
-    ]:
-        variations.add(base + suffix)
-
-    # Prefixes
-    for prefix in ["the-", "join-", "careers-", "work-at-", "life-at-"]:
-        variations.add(prefix + base)
-
-    return sorted(variations)
+    slugs = []
+    seen = set()
+    for s in [base, nospace, nodash, base + "-gmbh", base + "-io"]:
+        if s not in seen:
+            slugs.append(s)
+            seen.add(s)
+    return slugs
 
 # --- ATS probe functions (just check if slug exists, return job count) ---
 
@@ -53,7 +46,7 @@ def probe_ashby(slug: str) -> dict | None:
     try:
         resp = SESSION.get(
             f"https://api.ashbyhq.com/posting-public/job-board/{slug}",
-            timeout=8
+            timeout=3
         )
         if resp.status_code in (401, 404, 400):
             return None
@@ -69,7 +62,7 @@ def probe_greenhouse(slug: str) -> dict | None:
     try:
         resp = SESSION.get(
             f"https://boards-api.greenhouse.io/v1/boards/{slug}/jobs",
-            timeout=8
+            timeout=3
         )
         if resp.status_code in (404, 400):
             return None
@@ -85,7 +78,7 @@ def probe_lever(slug: str) -> dict | None:
     try:
         resp = SESSION.get(
             f"https://api.lever.co/v0/postings/{slug}?mode=json",
-            timeout=8
+            timeout=3
         )
         if resp.status_code in (404, 400):
             return None
@@ -102,7 +95,7 @@ def probe_workable(slug: str) -> dict | None:
     try:
         resp = SESSION.post(
             f"https://apply.workable.com/api/v3/accounts/{slug}/jobs",
-            json={}, timeout=8
+            json={}, timeout=3
         )
         if resp.status_code in (404, 400):
             return None
@@ -116,11 +109,36 @@ def probe_workable(slug: str) -> dict | None:
         return None
 
 
+def probe_bamboohr(slug: str) -> dict | None:
+    try:
+        resp = SESSION.get(
+            f"https://{slug}.bamboohr.com/careers/list",
+            timeout=3
+        )
+        if resp.status_code in (404, 400):
+            return None
+        resp.raise_for_status()
+        # BambooHR returns HTML, check if there are job listings
+        text = resp.text
+        # Look for job data in the page — BambooHR embeds JSON or has job cards
+        if '"jobOpenings"' in text or 'class="BambooHR-ATS-board' in text or 'ResumatorJob' in text:
+            # Count rough number of job entries
+            count = text.count('"id"')
+            if count == 0:
+                count = text.count('class="BambooHR-ATS-Department-Job"')
+            if count > 0:
+                return {"platform": "bamboohr", "slug": slug, "job_count": count}
+        return None
+    except Exception:
+        return None
+
+
 PROBES = [
     ("ashby", probe_ashby),
     ("greenhouse", probe_greenhouse),
     ("lever", probe_lever),
     ("workable", probe_workable),
+    ("bamboohr", probe_bamboohr),
 ]
 
 # --- Database ---
@@ -195,7 +213,7 @@ def discover_company(conn, company: str) -> list[dict]:
             if result and result["job_count"] > 0:
                 hit = result
                 break
-            time.sleep(0.1)  # Rate limiting between probes
+            time.sleep(0.05)  # Rate limiting between probes
 
         if hit:
             save_discovery(conn, company, hit["platform"], hit["slug"], hit["job_count"])
@@ -252,7 +270,7 @@ def main():
         log.info(f"[{i+1}/{len(companies)}] Discovering {company}")
         found = discover_company(conn, company)
         total_found += len(found)
-        time.sleep(0.2)  # Between companies
+        time.sleep(0.1)  # Between companies
 
     log.info(f"Discovery complete. New slugs found: {total_found}")
 

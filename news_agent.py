@@ -59,7 +59,7 @@ TOOLS = [
 
 def tavily_search(query: str) -> list[dict]:
     try:
-        resp = tavily.search(query=query, max_results=5, days=3)
+        resp = tavily.search(query=query, max_results=5, days=3, include_domains=["gruenderszene.de", "deutsche-startups.de", "techcrunch.com", "sifted.eu", "scalingeurope.com", "marketfit.media", "crunchbase.com", "bloomberg.com"])
         return [
             {
                 "title": r.get("title", ""),
@@ -75,7 +75,7 @@ def tavily_search(query: str) -> list[dict]:
 
 def tavily_search_news(query: str) -> list[dict]:
     try:
-        resp = tavily.search(query=query, max_results=5, topic="news", days=3)
+        resp = tavily.search(query=query, max_results=5, topic="news", days=3, include_domains=["gruenderszene.de", "deutsche-startups.de", "techcrunch.com", "sifted.eu", "scalingeurope.com", "marketfit.media", "crunchbase.com", "bloomberg.com"])
         return [
             {
                 "title": r.get("title", ""),

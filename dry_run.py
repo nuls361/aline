@@ -8,6 +8,7 @@ Usage:
   python dry_run.py --url "https://jobs.ashbyhq.com/somecompany/cfo-interim"
   python dry_run.py --url "https://www.linkedin.com/jobs/view/123456789" --verbose
   python dry_run.py --url "..." --no-apollo
+  python dry_run.py --url "..." --no-apollo --no-tavily  # skip Tavily (SSL fix for macOS Python 3.9)
 """
 
 import os
@@ -25,14 +26,14 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 log = logging.getLogger(__name__)
 
 # --- Config ---
-ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 APOLLO_API_KEY = os.environ.get("APOLLO_API_KEY", "")
-TAVILY_API_KEY = os.environ["TAVILY_API_KEY"]
+TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY", "")
 ATTIO_API_KEY = os.environ.get("ATTIO_API_KEY", "")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-claude = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+claude = None  # initialized in main()
 
 SESSION = requests.Session()
 SESSION.headers.update({
@@ -40,6 +41,7 @@ SESSION.headers.update({
 })
 
 VERBOSE = False
+SKIP_TAVILY = False
 
 # --- Helpers ---
 
@@ -138,20 +140,24 @@ def enrich_company(company_name: str) -> dict:
     """Enrich company info via Tavily."""
     p("\U0001f3e2", f"Enriching company: {company_name}")
 
-    from tavily import TavilyClient
-    tavily = TavilyClient(api_key=TAVILY_API_KEY)
+    results = []
+    if SKIP_TAVILY:
+        p("⏭️", "Skipping Tavily (--no-tavily flag) — Claude-only enrichment")
+    else:
+        from tavily import TavilyClient
+        tavily = TavilyClient(api_key=TAVILY_API_KEY)
 
-    try:
-        resp = tavily.search(
-            query=f"{company_name} company domain website funding employees DACH",
-            max_results=3,
-            days=30,
-        )
-        results = resp.get("results", [])
-        p_verbose("Tavily company results", results)
-    except Exception as e:
-        p("\u26a0\ufe0f", f"Tavily search failed: {e}")
-        results = []
+        try:
+            resp = tavily.search(
+                query=f"{company_name} company domain website funding employees DACH",
+                max_results=3,
+                days=30,
+            )
+            results = resp.get("results", [])
+            p_verbose("Tavily company results", results)
+        except Exception as e:
+            p("\u26a0\ufe0f", f"Tavily search failed: {e}")
+            results = []
 
     # Use Claude to extract structured info
     context = "\n".join([
@@ -333,6 +339,17 @@ Return JSON:
         p("\u23ed\ufe0f", "Skipping Apollo (--no-apollo flag)")
 
     # Fallback: Tavily search
+    if SKIP_TAVILY:
+        p("⏭️", "Skipping Tavily people search (--no-tavily flag)")
+        p("⚠️", f"No decision maker found — using placeholder for demo")
+        return {
+            "name": f"[{targeting['target_titles'][0]}]",
+            "title": targeting["target_titles"][0],
+            "email": "",
+            "linkedin_url": "",
+            "source": "placeholder (--no-tavily)",
+        }
+
     p("\U0001f50d", f"Tavily fallback: searching for {targeting['target_titles'][0]} at {company_name}")
     from tavily import TavilyClient
     tavily = TavilyClient(api_key=TAVILY_API_KEY)
@@ -400,17 +417,37 @@ def generate_email(jd: dict, company_info: dict, role_info: dict, dm: dict) -> d
 
 Write a cold outreach email to {dm.get('name', 'the decision maker')}, {dm.get('title', '')} at {jd.get('company', '')}.
 
-Context:
-- We spotted this signal: {role_info.get('signal_type', '')} — this company is hiring for a {jd.get('title', '')}
-- We place Fractional/Interim {role_info.get('role_function', '')} executives into DACH startups. We're not recruiters. We're operators.
-- The role we see a fit for: {jd.get('title', '')}
-- Company info: {company_info.get('one_liner', '')} | Stage: {company_info.get('funding_stage', '')}
+ENRICHMENT CONTEXT (use this — we did the research):
+- Signal spotted: {role_info.get('signal_type', '')}
+- Role: {jd.get('title', '')} ({role_info.get('engagement_type', 'Unknown')} position)
+- Company: {jd.get('company', '')} — {company_info.get('one_liner', 'unknown')}
+- Stage: {company_info.get('funding_stage', 'unknown')} | Size: ~{company_info.get('headcount', 'unknown')}
+- Domain: {company_info.get('domain', 'unknown')}
+- Location: {jd.get('location', 'DACH')}
+
+PITCH LOGIC — this is critical:
+- The posted role is: {role_info.get('engagement_type', 'Unknown')}
+- If the role is Full-time: position Aline's fractional/interim executive as a BRIDGE solution. The angle is: "While you search for the permanent hire, we can place a fractional executive who has done this before — starts Monday, owns the function from day one, de-risks the transition."
+- If the role is Fractional or Interim: pitch directly. We are the perfect fit. No bridge framing needed.
+- Always translate the role into Aline's language: we place operators, not candidates.
+- IMPORTANT: Match the executive type to the DECISION MAKER who would hire for this role, not the role function itself. Examples:
+  - Data Science / Analytics role → the buyer is the CTO or VP Engineering → pitch a fractional CTO
+  - Sales role → the buyer is the CEO or CRO → pitch a fractional Sales/Revenue leader
+  - Finance role → the buyer is the CEO → pitch a fractional CFO
+  Think about who OWNS this hire and what Aline executive type maps to that buyer's need.
+
+STRUCTURE (follow this order):
+1. Greeting: "Hi [First Name]," — ALWAYS use the decision maker's first name. Never skip it.
+2. First line: reference the specific signal and company context (use enrichment data). Write complete sentences with proper grammar.
+3. Bridge/pitch: why a fractional/interim executive makes sense for THIS situation.
+4. Proof: one line about Aline's structural advantage (same-day shortlist, operators who have done this at-stage).
+5. CTA: include the booking link https://cal.com/niels-zanotto/30min for scheduling.
+6. Sign-off: "Best, Niels" — always end with this.
 
 Rules:
-- Max 5 sentences in the body. No fluff.
-- Opening line must reference the specific signal (not generic).
+- Max 5 sentences in the body (excluding greeting and sign-off). No fluff.
+- Write complete, professional sentences. Never drop the subject ("I", "We"). Not sloppy-casual.
 - No "I hope this finds you well". No "Dear Sir/Madam".
-- CTA: one clear question or ask. Never "let me know if you're interested."
 - Subject line: max 8 words, no clickbait.
 - Language: English unless company is clearly German-only (check domain/name).
 
@@ -418,6 +455,7 @@ Return JSON:
 {{
   "subject": "...",
   "body": "...",
+  "pitch_type": "bridge" or "direct",
   "reasoning": "why this angle for this signal type"
 }}"""}],
         )
@@ -463,15 +501,27 @@ def print_summary(jd: dict, dm: dict, email_data: dict):
 # --- Main ---
 
 def main():
-    global VERBOSE
+    global VERBOSE, SKIP_TAVILY
 
     parser = argparse.ArgumentParser(description="Aline Dry Run — test the full outreach pipeline")
     parser.add_argument("--url", required=True, help="JD URL to test")
     parser.add_argument("--verbose", action="store_true", help="Print full API responses")
     parser.add_argument("--no-apollo", action="store_true", help="Skip Apollo search")
+    parser.add_argument("--no-tavily", action="store_true", help="Skip Tavily calls (avoids SSL issues on macOS Python 3.9)")
     args = parser.parse_args()
 
     VERBOSE = args.verbose
+    SKIP_TAVILY = args.no_tavily
+
+    global claude
+    if not ANTHROPIC_API_KEY:
+        p("❌", "ANTHROPIC_API_KEY not set. Export it first.")
+        sys.exit(1)
+    claude = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+
+    if not SKIP_TAVILY and not TAVILY_API_KEY:
+        p("⚠️", "TAVILY_API_KEY not set. Use --no-tavily to skip Tavily calls.")
+        sys.exit(1)
 
     print()
     print("=" * 60)

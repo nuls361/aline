@@ -15,3 +15,5 @@
 !slug_discovery.py
 !ats_slugs.db
 !companies.txt
+!role_scraper.py
+!role_scraper_sent_urls.json

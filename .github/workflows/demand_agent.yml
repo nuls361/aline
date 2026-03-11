@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  run:
+  demand:
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -18,3 +18,27 @@ jobs:
       - run: python demand_agent.py
         env:
           SLACK_WEBHOOK_HOT_LEADS: ${{ secrets.SLACK_WEBHOOK_HOT_LEADS }}
+
+  scrape-roles:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install requests beautifulsoup4
+      - run: python role_scraper.py
+        env:
+          RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
+          ATTIO_API_KEY: ${{ secrets.ATTIO_API_KEY }}
+          SLACK_WEBHOOK_HOT_LEADS: ${{ secrets.SLACK_WEBHOOK_HOT_LEADS }}
+      - name: Commit sent URLs
+        run: |
+          git config user.email "agent@get-aline.com"
+          git config user.name "Aline Role Scraper"
+          git pull --rebase || true
+          git add role_scraper_sent_urls.json
+          git diff --cached --quiet || git commit -m "chore: update role_scraper_sent_urls"
+          git push

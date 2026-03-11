@@ -440,7 +440,7 @@ STRUCTURE (follow this order):
 1. Greeting: "Hi [First Name]," — ALWAYS use the decision maker's first name. Never skip it.
 2. First line: reference the specific signal and company context (use enrichment data). Write complete sentences with proper grammar.
 3. Bridge/pitch: why a fractional/interim executive makes sense for THIS situation.
-4. Proof: one line about Aline's structural advantage (same-day shortlist, operators who have done this at-stage).
+4. Proof/social proof: one line about Aline's credibility. Our partners have operated at Microsoft, Deutsche Bank, Oda, and Zalando. Pick the reference that is most relevant to the target company's industry or stage. Do NOT list all four — pick one or two that resonate.
 5. CTA: include the booking link https://cal.com/niels-zanotto/30min for scheduling.
 6. Sign-off: "Best, Niels" — always end with this.
 

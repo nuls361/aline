@@ -23,3 +23,5 @@
 !email_agent.service
 !email_agent.timer
 !dry_run.py
+!slack_bot.py
+!slack_bot.service

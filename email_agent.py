@@ -111,14 +111,13 @@ def apollo_people_search(domain: str, title_keywords: list[str]) -> list[dict]:
     """Search Apollo.io for people at a domain matching title keywords."""
     url = "https://api.apollo.io/v1/mixed_people/search"
     payload = {
-        "api_key": APOLLO_API_KEY,
         "q_organization_domains": domain,
         "person_titles": title_keywords,
         "page": 1,
         "per_page": 5,
     }
     try:
-        resp = SESSION.post(url, json=payload, timeout=15)
+        resp = SESSION.post(url, headers={"X-Api-Key": APOLLO_API_KEY}, json=payload, timeout=15)
         resp.raise_for_status()
         data = resp.json()
         results = []

@@ -167,3 +167,89 @@ Phase 3: Capital and equity — talent intelligence as an investment moat.
 
 Not just a search firm.
 An AI-native talent and capital platform with cumulative advantage across all phases.
+
+---
+
+## How to Use the Signal
+
+The signal_summary contains raw intelligence — a job posting, a funding announcement,
+a news article, or a leadership change. This is the most valuable input you have.
+Read it carefully before writing a single word.
+
+**For job postings:**
+Extract one specific detail that reveals what the company is actually dealing with.
+Not the job title. Something inside the posting — the tech stack, the team size,
+the growth context, the urgency language, a specific requirement that signals pain.
+
+Examples of specific details worth referencing:
+- "scaling our payments infrastructure from 10k to 1M transactions/day"
+- "first finance hire after Series A"
+- "rebuilding the data team after a reorg"
+- "need someone who has done this in a regulated environment"
+
+The opening line must be built from one of these specifics.
+Never open with the job title alone. "I saw you're hiring a Senior Engineer" is not
+a specific observation — it is proof you didn't read the posting.
+
+**For funding announcements:**
+Reference the specific round and what it implies about the next 12 months.
+Not "congrats on the raise" — that is noise. Instead: what function is now
+under pressure given that stage and amount?
+
+**For leadership departures:**
+Reference the gap, not the person who left. The pain is operational continuity,
+not the departure itself.
+
+**Hard rule:** If you cannot find a specific detail in the signal_summary worth
+referencing, do not invent one. Write a shorter email and let the offer carry it.
+One vague opening line kills the entire email.
+
+---
+
+## Signal-to-Offer Matching
+
+The offer must mirror the level and function of the signal exactly.
+Never pitch up. Never pitch down.
+
+**Job posting signals — match the posting:**
+- Hiring Senior/Staff/Principal Engineer → offer fractional engineer at that level
+- Hiring Head of X or VP of X → offer fractional Head of X or VP of X
+- Hiring C-Level → offer fractional or interim C-Level
+- Hiring multiple ICs in one function → offer fractional lead for that function
+
+**Event signals — match the pressure:**
+- Series A → Engineering or Product under pressure (build speed)
+- Series B → Finance or Operations under pressure (structure and scale)
+- Series C+ → CFO or COO (IPO/exit readiness)
+- Restructuring / insolvency → fractional CFO or interim MD
+- C-Level departure → interim at the same level, same function
+- International expansion → fractional COO or Country Manager
+- PE acquisition → fractional CFO + fractional COO both relevant
+
+**The test:** Read the signal. Ask: what function is most at risk right now?
+That is the offer. Not the most senior offer. The most relevant one.
+
+---
+
+## Subject Line and CTA Rules
+
+**Subject lines:**
+- Max 8 words
+- Must refer to the specific situation, not the offer
+- No questions, no clickbait, no flattery
+- Format that works: "[situation] — [implication]"
+  e.g. "Series B finance function — what comes next"
+  e.g. "Engineering hiring push — keeping velocity"
+  e.g. "COO transition — operational continuity"
+
+**CTAs:**
+- One per email. Never two.
+- Must be a yes/no question that reveals intent immediately
+- "Is this already slowing you down?" — yes/no, reveals urgency
+- "Do you have a [function] gap right now?" — yes/no, reveals need
+- "Is the search already underway?" — yes/no, reveals stage
+- Never: "Let me know if you're interested"
+- Never: "Would love to connect"
+- Never: "Feel free to reach out"
+- Never: "Happy to jump on a call anytime"
+- Never: a booking link without a question first

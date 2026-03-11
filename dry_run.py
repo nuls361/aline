@@ -74,6 +74,7 @@ def fetch_jd(url: str) -> dict:
     # Try structured data first
     title = ""
     company = ""
+    company_url = ""
     location = ""
     description = ""
 
@@ -85,6 +86,7 @@ def fetch_jd(url: str) -> dict:
                 title = ld.get("title", "")
                 org = ld.get("hiringOrganization", {})
                 company = org.get("name", "") if isinstance(org, dict) else ""
+                company_url = (org.get("sameAs") or org.get("url") or "") if isinstance(org, dict) else ""
                 loc = ld.get("jobLocation", {})
                 if isinstance(loc, list) and loc:
                     loc = loc[0]
@@ -126,6 +128,7 @@ def fetch_jd(url: str) -> dict:
     result = {
         "title": title,
         "company": company,
+        "company_url": company_url,
         "location": location,
         "description": description,
         "url": url,
@@ -136,9 +139,17 @@ def fetch_jd(url: str) -> dict:
 
 # --- Step 2: Enrich company ---
 
-def enrich_company(company_name: str) -> dict:
+def enrich_company(company_name: str, company_url: str = "") -> dict:
     """Enrich company info via Tavily."""
     p("\U0001f3e2", f"Enriching company: {company_name}")
+
+    # Extract domain from company URL if available
+    known_domain = ""
+    if company_url:
+        from urllib.parse import urlparse
+        parsed = urlparse(company_url)
+        known_domain = parsed.netloc or parsed.path
+        known_domain = known_domain.removeprefix("www.")
 
     results = []
     if SKIP_TAVILY:
@@ -188,6 +199,9 @@ Return JSON: {{"domain": "...", "headcount": "...", "funding_stage": "...", "one
                 end = text.rfind("}")
                 if start != -1 and end != -1:
                     info = json.loads(text[start:end+1])
+                    # Prefer domain from JD structured data over Claude's guess
+                    if known_domain:
+                        info["domain"] = known_domain
                     p("\U0001f3e2", f"Company: {company_name} | Domain: {info.get('domain', '?')} | "
                       f"Size: ~{info.get('headcount', '?')} | Stage: {info.get('funding_stage', '?')}")
                     p("  ", f"What they do: {info.get('one_liner', '?')}")
@@ -195,7 +209,7 @@ Return JSON: {{"domain": "...", "headcount": "...", "funding_stage": "...", "one
     except Exception as e:
         p("\u26a0\ufe0f", f"Claude enrichment failed: {e}")
 
-    return {"domain": "", "headcount": "unknown", "funding_stage": "unknown"}
+    return {"domain": known_domain or "", "headcount": "unknown", "funding_stage": "unknown"}
 
 
 # --- Step 3: Classify role ---
@@ -299,8 +313,8 @@ Return JSON:
         try:
             resp = SESSION.post(
                 "https://api.apollo.io/v1/mixed_people/search",
+                headers={"X-Api-Key": APOLLO_API_KEY},
                 json={
-                    "api_key": APOLLO_API_KEY,
                     "q_organization_domains": domain,
                     "person_titles": targeting["target_titles"],
                     "page": 1,
@@ -437,15 +451,18 @@ PITCH LOGIC — this is critical:
   Think about who OWNS this hire and what Aline executive type maps to that buyer's need.
 
 STRUCTURE (follow this order):
-1. Greeting: "Hi [First Name]," — ALWAYS use the decision maker's first name. Never skip it.
-2. First line: reference the specific signal and company context (use enrichment data). Write complete sentences with proper grammar.
-3. Bridge/pitch: why a fractional/interim executive makes sense for THIS situation.
-4. Proof/social proof: one line about Aline's credibility. Our partners have operated at Microsoft, Deutsche Bank, Oda, and Zalando. Pick the reference that is most relevant to the target company's industry or stage. Do NOT list all four — pick one or two that resonate.
-5. CTA: include the booking link https://cal.com/niels-zanotto/30min for scheduling.
-6. Sign-off: "Best, Niels" — always end with this.
+1. Greeting: "Hi [First Name]," — always use the decision maker's first name.
+2. Context hook (1–2 sentences): Show you did the homework. Reference the specific role AND something about the company (what they do, their stage, a recent event). Not just "I saw you're hiring X." Example: "I noticed Peec is hiring a Head of Sales — scaling an AI sales team post-Series A is one of the harder builds to get right."
+3. The insight (1 sentence): Why this moment matters. Connect the signal to a challenge they likely face. Example: "Getting a senior sales leader wrong at this stage costs you two quarters."
+4. Bridge/pitch (1–2 sentences): Position the fractional/interim exec as the solution. Be specific about what they would own. Example: "We place fractional CROs who have built this function before — they can own pipeline, process, and first hires while you run the permanent search."
+5. Social proof (1 sentence): Weave it in naturally, connected to their situation. Not a standalone logo dump. Our partners have operated at Microsoft, Deutsche Bank, Oda, and Zalando — pick the one or two most relevant to the recipient's industry or stage. Example: "Our partners have built sales orgs at Zalando and Oda — same stage, same velocity."
+6. CTA + sign-off: include the booking link https://cal.com/niels-zanotto/30min. End with "Best, Niels".
 
 Rules:
-- Max 5 sentences in the body (excluding greeting and sign-off). No fluff.
+- 6–8 sentences in the body (excluding greeting and sign-off). ~100–150 words. Not shorter.
+- The context hook MUST use enrichment data (company one-liner, stage, domain). Show the research.
+- Social proof must connect to the recipient's industry or stage, not be a standalone line.
+- Tone: a sharp partner writing to a peer, not a sales automation.
 - Write complete, professional sentences. Never drop the subject ("I", "We"). Not sloppy-casual.
 - No "I hope this finds you well". No "Dear Sir/Madam".
 - Subject line: max 8 words, no clickbait.
@@ -539,7 +556,7 @@ def main():
     # Step 2: Enrich company
     company_info = {}
     if jd.get("company"):
-        company_info = enrich_company(jd["company"])
+        company_info = enrich_company(jd["company"], jd.get("company_url", ""))
     else:
         p("\u26a0\ufe0f", "No company name found in JD, skipping enrichment")
     print()

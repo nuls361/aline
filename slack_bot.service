@@ -1,0 +1,14 @@
+[Unit]
+Description=Aline Slack Bot
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/aline
+ExecStart=/usr/bin/python3 slack_bot.py
+EnvironmentFile=/opt/aline/.env
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

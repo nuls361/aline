@@ -8,6 +8,8 @@ on:
       - email_agent.py
       - email_agent.service
       - email_agent.timer
+      - slack_bot.py
+      - slack_bot.service
       - attio_client.py
       - soul.md
       - skill.md
@@ -36,7 +38,7 @@ jobs:
             fi
 
             # Install dependencies
-            pip3 install fastapi uvicorn requests anthropic tavily-python
+            pip3 install fastapi uvicorn requests anthropic tavily-python beautifulsoup4 slack-bolt
 
             # Deploy webhook listener
             cp webhook_listener.service /etc/systemd/system/webhook_listener.service
@@ -51,4 +53,10 @@ jobs:
             systemctl enable email_agent.timer
             systemctl start email_agent.timer
 
-            echo "Deployed: webhook_listener (running) + email_agent (Mon-Fri 08:00)"
+            # Deploy Slack bot
+            cp slack_bot.service /etc/systemd/system/slack_bot.service
+            systemctl daemon-reload
+            systemctl enable slack_bot
+            systemctl restart slack_bot
+
+            echo "Deployed: webhook_listener + email_agent (Mon-Fri 08:00) + slack_bot"

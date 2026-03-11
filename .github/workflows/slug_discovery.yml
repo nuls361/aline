@@ -1,0 +1,23 @@
+name: Slug Discovery
+on:
+  workflow_dispatch:
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install requests
+      - run: python slug_discovery.py companies.txt
+      - name: Commit database
+        run: |
+          git config user.email "agent@get-aline.com"
+          git config user.name "Aline News Agent"
+          git add ats_slugs.db
+          git diff --cached --quiet || git commit -m "chore: update ats_slugs.db after discovery"
+          git push

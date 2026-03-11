@@ -1,9 +1,12 @@
+from __future__ import annotations
+
 import os
 import json
 import sqlite3
 import logging
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Optional
 
 import requests
 

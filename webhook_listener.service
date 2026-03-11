@@ -1,0 +1,15 @@
+[Unit]
+Description=Aline Webhook Listener
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/aline
+ExecStart=/usr/local/bin/uvicorn webhook_listener:app --host 0.0.0.0 --port 8080
+Restart=always
+RestartSec=5
+EnvironmentFile=/opt/aline/.env
+
+[Install]
+WantedBy=multi-user.target

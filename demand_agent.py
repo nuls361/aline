@@ -1,5 +1,6 @@
 import os
 import json
+import sqlite3
 import logging
 import time
 from datetime import datetime, timezone
@@ -11,22 +12,9 @@ log = logging.getLogger(__name__)
 
 # --- Config ---
 SLACK_WEBHOOK = os.environ["SLACK_WEBHOOK_HOT_LEADS"]
-SENT_URLS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "demand_sent_urls.json")
-
-COMPANIES = [
-    # Known Greenhouse
-    "personio", "celonis", "contentful", "sumup", "commercetools", "raisin",
-    "pleo", "n26", "delivery-hero", "hellofresh", "zalando", "auto1",
-    "aboutyou", "flixbus", "idealo", "scout24", "check24", "home24",
-    "windeln", "westwing", "mytheresa", "chronext",
-    # Known Lever
-    "gorillas", "flink", "getir-de", "tier-mobility", "voi", "dott", "bolt-eu",
-    # Multi-platform (try all)
-    "forto", "billie", "taxfix", "staffbase", "mambu", "sennder", "moonfare",
-    "spryker", "babbel", "wefox", "solaris", "scalable-capital",
-    "zenjob", "workmotion", "remote", "factorial", "leapsome",
-    "hibob", "humaans", "picsart", "bitpanda-tech",
-]
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+SENT_URLS_PATH = os.path.join(BASE_DIR, "demand_sent_urls.json")
+DB_PATH = os.path.join(BASE_DIR, "ats_slugs.db")
 
 TITLE_KEYWORDS = [
     "head of", "vp ", "vp,", "vice president", "chief", "director",
@@ -42,10 +30,22 @@ DACH_KEYWORDS = [
 SESSION = requests.Session()
 SESSION.headers.update({"User-Agent": "Aline-Demand-Agent/1.0"})
 
+# --- Load targets from database ---
+
+def load_targets() -> list[dict]:
+    """Load discovered slugs from SQLite database."""
+    conn = sqlite3.connect(DB_PATH)
+    rows = conn.execute(
+        "SELECT company, platform, slug FROM discovered_slugs ORDER BY company"
+    ).fetchall()
+    conn.close()
+    return [{"company": r[0], "platform": r[1], "slug": r[2]} for r in rows]
+
 # --- ATS Fetchers ---
 
-def fetch_ashby(slug: str) -> list[dict]:
-    """Ashby public job board API — response has 'jobPostings' with 'title', 'locationName', 'jobUrl'."""
+FETCHER_MAP = {}
+
+def fetch_ashby(slug: str, company: str) -> list[dict]:
     url = f"https://api.ashbyhq.com/posting-public/job-board/{slug}"
     try:
         resp = SESSION.get(url, timeout=10)
@@ -64,7 +64,7 @@ def fetch_ashby(slug: str) -> list[dict]:
             if not matches_location(location):
                 continue
             results.append({
-                "company": slug,
+                "company": company,
                 "title": title,
                 "location": location,
                 "url": job.get("jobUrl", ""),
@@ -76,9 +76,10 @@ def fetch_ashby(slug: str) -> list[dict]:
         log.debug(f"Ashby {slug}: {e}")
         return []
 
+FETCHER_MAP["ashby"] = fetch_ashby
 
-def fetch_greenhouse(slug: str) -> list[dict]:
-    """Greenhouse JSON API — response has 'jobs' with 'title', 'location.name', 'absolute_url'."""
+
+def fetch_greenhouse(slug: str, company: str) -> list[dict]:
     url = f"https://boards-api.greenhouse.io/v1/boards/{slug}/jobs"
     try:
         resp = SESSION.get(url, timeout=10)
@@ -99,7 +100,7 @@ def fetch_greenhouse(slug: str) -> list[dict]:
             updated = job.get("updated_at", "")
             posted_date = updated[:10] if updated else None
             results.append({
-                "company": slug,
+                "company": company,
                 "title": title,
                 "location": location,
                 "url": job_url,
@@ -111,9 +112,10 @@ def fetch_greenhouse(slug: str) -> list[dict]:
         log.debug(f"Greenhouse {slug}: {e}")
         return []
 
+FETCHER_MAP["greenhouse"] = fetch_greenhouse
 
-def fetch_lever(slug: str) -> list[dict]:
-    """Lever JSON API — response is array with 'text' (title), 'categories.location', 'hostedUrl'."""
+
+def fetch_lever(slug: str, company: str) -> list[dict]:
     url = f"https://api.lever.co/v0/postings/{slug}?mode=json"
     try:
         resp = SESSION.get(url, timeout=10)
@@ -140,7 +142,7 @@ def fetch_lever(slug: str) -> list[dict]:
                 except (ValueError, TypeError):
                     pass
             results.append({
-                "company": slug,
+                "company": company,
                 "title": title,
                 "location": location,
                 "url": posting.get("hostedUrl", ""),
@@ -152,9 +154,10 @@ def fetch_lever(slug: str) -> list[dict]:
         log.debug(f"Lever {slug}: {e}")
         return []
 
+FETCHER_MAP["lever"] = fetch_lever
 
-def fetch_workable(slug: str) -> list[dict]:
-    """Workable public API v3 — POST to get jobs list."""
+
+def fetch_workable(slug: str, company: str) -> list[dict]:
     url = f"https://apply.workable.com/api/v3/accounts/{slug}/jobs"
     try:
         resp = SESSION.post(url, json={}, timeout=10)
@@ -178,7 +181,7 @@ def fetch_workable(slug: str) -> list[dict]:
             shortcode = job.get("shortcode", "")
             job_url = f"https://apply.workable.com/{slug}/j/{shortcode}/" if shortcode else ""
             results.append({
-                "company": slug,
+                "company": company,
                 "title": title,
                 "location": location,
                 "url": job_url,
@@ -190,8 +193,7 @@ def fetch_workable(slug: str) -> list[dict]:
         log.debug(f"Workable {slug}: {e}")
         return []
 
-
-ATS_FETCHERS = [fetch_ashby, fetch_greenhouse, fetch_lever, fetch_workable]
+FETCHER_MAP["workable"] = fetch_workable
 
 # --- Filter ---
 
@@ -254,28 +256,42 @@ def format_summary(companies: int, jobs: int) -> str:
 # --- Main ---
 
 def main():
+    targets = load_targets()
+    if not targets:
+        log.error("No discovered slugs in database. Run slug_discovery.py first.")
+        send_slack("\u26a0\ufe0f *Demand Agent*: No companies in database. Run slug discovery first.")
+        return
+
+    log.info(f"Loaded {len(targets)} company/platform pairs from database")
+
     sent_urls = load_sent_urls()
     jobs_found = 0
     companies_scanned = set()
 
-    for slug in COMPANIES:
-        log.info(f"Scanning {slug}")
-        for fetcher in ATS_FETCHERS:
-            jobs = fetcher(slug)
-            if jobs:
-                companies_scanned.add(slug)
-                log.info(f"  {fetcher.__name__} returned {len(jobs)} executive roles")
-                for job in jobs:
-                    url = job.get("url", "")
-                    if not url or url in sent_urls:
-                        continue
-                    send_slack(format_finding(job))
-                    sent_urls.add(url)
-                    jobs_found += 1
-                    log.info(f"  NEW: {job['title']} at {slug} ({job['ats']})")
-        time.sleep(0.3)  # Polite rate limiting between companies
+    for target in targets:
+        company = target["company"]
+        platform = target["platform"]
+        slug = target["slug"]
+        fetcher = FETCHER_MAP.get(platform)
+        if not fetcher:
+            continue
 
-    send_slack(format_summary(len(COMPANIES), jobs_found))
+        log.info(f"Scanning {company} ({platform}/{slug})")
+        jobs = fetcher(slug, company)
+        if jobs:
+            companies_scanned.add(company)
+            log.info(f"  {len(jobs)} executive roles in DACH")
+            for job in jobs:
+                url = job.get("url", "")
+                if not url or url in sent_urls:
+                    continue
+                send_slack(format_finding(job))
+                sent_urls.add(url)
+                jobs_found += 1
+                log.info(f"  NEW: {job['title']} at {company} ({job['ats']})")
+        time.sleep(0.3)
+
+    send_slack(format_summary(len(targets), jobs_found))
     save_sent_urls(sent_urls)
     commit_sent_urls()
     log.info(f"Done. Companies with hits: {len(companies_scanned)} | Executive roles: {jobs_found}")

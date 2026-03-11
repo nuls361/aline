@@ -12,3 +12,6 @@
 !soul.md
 !demand_agent.py
 !demand_sent_urls.json
+!slug_discovery.py
+!ats_slugs.db
+!companies.txt

@@ -1,0 +1,9 @@
+[Unit]
+Description=Run Aline Email Agent Mon-Fri at 08:00
+
+[Timer]
+OnCalendar=Mon..Fri 08:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

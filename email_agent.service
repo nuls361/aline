@@ -1,0 +1,9 @@
+[Unit]
+Description=Aline Email Agent (one-shot, triggered by timer)
+After=network.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/aline
+ExecStart=/usr/bin/python3 email_agent.py
+EnvironmentFile=/opt/aline/.env

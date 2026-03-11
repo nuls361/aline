@@ -1,10 +1,16 @@
-name: Deploy Webhook Listener
+name: Deploy to Hetzner
 on:
   workflow_dispatch:
   push:
     paths:
       - webhook_listener.py
       - webhook_listener.service
+      - email_agent.py
+      - email_agent.service
+      - email_agent.timer
+      - attio_client.py
+      - soul.md
+      - skill.md
 
 jobs:
   deploy:
@@ -32,10 +38,17 @@ jobs:
             # Install dependencies
             pip3 install fastapi uvicorn requests anthropic tavily-python
 
-            # Copy systemd service
+            # Deploy webhook listener
             cp webhook_listener.service /etc/systemd/system/webhook_listener.service
             systemctl daemon-reload
             systemctl enable webhook_listener
             systemctl restart webhook_listener
 
-            echo "Webhook listener deployed and running"
+            # Deploy email agent timer
+            cp email_agent.service /etc/systemd/system/email_agent.service
+            cp email_agent.timer /etc/systemd/system/email_agent.timer
+            systemctl daemon-reload
+            systemctl enable email_agent.timer
+            systemctl start email_agent.timer
+
+            echo "Deployed: webhook_listener (running) + email_agent (Mon-Fri 08:00)"

@@ -20,4 +20,6 @@
 !email_agent.py
 !webhook_listener.py
 !webhook_listener.service
+!email_agent.service
+!email_agent.timer
 !dry_run.py

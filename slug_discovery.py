@@ -45,14 +45,31 @@ def generate_slugs(company: str) -> list[str]:
 def probe_ashby(slug: str) -> dict | None:
     try:
         resp = SESSION.get(
-            f"https://api.ashbyhq.com/posting-public/job-board/{slug}",
+            f"https://jobs.ashbyhq.com/{slug}",
             timeout=3
         )
-        if resp.status_code in (401, 404, 400):
+        if resp.status_code in (404, 400):
             return None
         resp.raise_for_status()
-        data = resp.json()
-        jobs = data.get("jobPostings", data.get("jobs", []))
+        html = resp.text
+        if '"jobPostings"' not in html:
+            return None
+        idx = html.find('"jobPostings"')
+        # Walk back to find enclosing {
+        brace = idx
+        depth = 0
+        while brace > 0:
+            brace -= 1
+            if html[brace] == '}': depth += 1
+            if html[brace] == '{':
+                if depth == 0: break
+                depth -= 1
+        import json as _json
+        decoder = _json.JSONDecoder()
+        obj, _ = decoder.raw_decode(html, brace)
+        jobs = obj.get("jobPostings", [])
+        if not jobs:
+            return None
         return {"platform": "ashby", "slug": slug, "job_count": len(jobs)}
     except Exception:
         return None

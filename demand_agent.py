@@ -46,29 +46,43 @@ def load_targets() -> list[dict]:
 FETCHER_MAP = {}
 
 def fetch_ashby(slug: str, company: str) -> list[dict]:
-    url = f"https://api.ashbyhq.com/posting-public/job-board/{slug}"
+    url = f"https://jobs.ashbyhq.com/{slug}"
     try:
         resp = SESSION.get(url, timeout=10)
-        if resp.status_code in (401, 404):
+        if resp.status_code in (404, 400):
             return []
         resp.raise_for_status()
-        data = resp.json()
+        html = resp.text
+        if '"jobPostings"' not in html:
+            return []
+        idx = html.find('"jobPostings"')
+        brace = idx
+        depth = 0
+        while brace > 0:
+            brace -= 1
+            if html[brace] == '}': depth += 1
+            if html[brace] == '{':
+                if depth == 0: break
+                depth -= 1
+        import json as _json
+        decoder = _json.JSONDecoder()
+        obj, _ = decoder.raw_decode(html, brace)
+        jobs = obj.get("jobPostings", [])
         results = []
-        for job in data.get("jobPostings", data.get("jobs", [])):
+        for job in jobs:
             title = job.get("title", "")
             if not matches_title(title):
                 continue
-            location = job.get("locationName", job.get("location", ""))
-            if isinstance(location, dict):
-                location = location.get("name", "")
+            location = job.get("locationName", "")
             if not matches_location(location):
                 continue
+            job_url = f"https://jobs.ashbyhq.com/{slug}/{job.get('id', '')}"
             results.append({
                 "company": company,
                 "title": title,
                 "location": location,
-                "url": job.get("jobUrl", ""),
-                "posted_date": job.get("publishedAt"),
+                "url": job_url,
+                "posted_date": job.get("updatedAt", "")[:10] if job.get("updatedAt") else None,
                 "ats": "Ashby"
             })
         return results
@@ -194,6 +208,49 @@ def fetch_workable(slug: str, company: str) -> list[dict]:
         return []
 
 FETCHER_MAP["workable"] = fetch_workable
+
+
+def fetch_bamboohr(slug: str, company: str) -> list[dict]:
+    """BambooHR — company.bamboohr.com/careers/list returns HTML with embedded job data."""
+    url = f"https://{slug}.bamboohr.com/careers/list"
+    try:
+        resp = SESSION.get(url, timeout=10)
+        if resp.status_code in (404, 400):
+            return []
+        resp.raise_for_status()
+        # Try to extract JSON job data from the page
+        import re
+        match = re.search(r'"jobOpenings"\s*:\s*(\[.*?\])\s*[,}]', resp.text, re.DOTALL)
+        if not match:
+            return []
+        import json as _json
+        jobs_data = _json.loads(match.group(1))
+        results = []
+        for job in jobs_data:
+            title = job.get("jobOpeningName", "")
+            if not matches_title(title):
+                continue
+            location = job.get("location", {})
+            if isinstance(location, dict):
+                location = location.get("city", "") + ", " + location.get("country", "")
+            if not matches_location(location):
+                continue
+            job_id = job.get("id", "")
+            job_url = f"https://{slug}.bamboohr.com/careers/{job_id}" if job_id else ""
+            results.append({
+                "company": company,
+                "title": title,
+                "location": location.strip(", "),
+                "url": job_url,
+                "posted_date": None,
+                "ats": "BambooHR"
+            })
+        return results
+    except Exception as e:
+        log.debug(f"BambooHR {slug}: {e}")
+        return []
+
+FETCHER_MAP["bamboohr"] = fetch_bamboohr
 
 # --- Filter ---
 

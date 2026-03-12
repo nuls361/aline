@@ -27,6 +27,7 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          capture_stdout: true
           envs: ANTHROPIC_API_KEY,TAVILY_API_KEY,APOLLO_API_KEY,ATTIO_API_KEY,INSTANTLY_API_KEY,RAPIDAPI_KEY,SLACK_BOT_TOKEN,SLACK_APP_TOKEN,SLACK_WEBHOOK_HOT_LEADS,SLACK_WEBHOOK_NEWS,SLACK_WEBHOOK_DAILY,SLACK_WEBHOOK_ALERTS,SLACK_WEBHOOK_AGENT_COMMS
           script: |
             mkdir -p /opt/aline

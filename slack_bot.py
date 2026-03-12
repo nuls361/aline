@@ -35,7 +35,7 @@ dry_run.claude = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY",
 JD_URL_PATTERN = re.compile(
     r"https?://(?:"
     r"jobs\.ashbyhq\.com|"
-    r"boards\.greenhouse\.io|"
+    r"(?:job-)?boards\.greenhouse\.io|"
     r"jobs\.lever\.co|"
     r"[\w.-]+\.recruitee\.com|"
     r"[\w.-]+\.workable\.com|"
@@ -45,6 +45,9 @@ JD_URL_PATTERN = re.compile(
 )
 
 app = App(token=SLACK_BOT_TOKEN)
+
+# Track processed message timestamps to avoid duplicates
+_processed_ts = set()
 
 
 def run_pipeline(url: str) -> dict:
@@ -122,16 +125,33 @@ def format_slack_reply(result: dict) -> str:
 @app.event("message")
 def handle_message(event, say):
     """Listen for messages containing JD URLs."""
-    text = event.get("text", "")
-    channel = event.get("channel", "")
-    ts = event.get("ts", "")
     subtype = event.get("subtype")
 
+    # For message_changed (Slack URL unfurling), extract from the edited message
+    if subtype == "message_changed":
+        message = event.get("message", {})
+        # Ignore if the edit is from a bot
+        if message.get("bot_id"):
+            return
+        text = message.get("text", "")
+        ts = message.get("ts", event.get("ts", ""))
+    elif subtype:
+        # Ignore other subtypes (bot messages, deletions, etc.)
+        return
+    else:
+        text = event.get("text", "")
+        ts = event.get("ts", "")
+
+    channel = event.get("channel", "")
     log.info(f"Message received: subtype={subtype} text={text[:200]}")
 
-    # Ignore bot messages, edits, etc.
-    if subtype:
+    # Dedup: skip if we already processed this message
+    if ts in _processed_ts:
         return
+    _processed_ts.add(ts)
+    # Keep set from growing forever
+    if len(_processed_ts) > 1000:
+        _processed_ts.clear()
 
     # Slack wraps URLs like <https://...|label> or <https://...>
     # Extract raw URLs from Slack's formatting first

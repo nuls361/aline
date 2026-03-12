@@ -10,6 +10,7 @@ on:
       - email_agent.timer
       - slack_bot.py
       - slack_bot.service
+      - dry_run.py
       - attio_client.py
       - soul.md
       - skill.md

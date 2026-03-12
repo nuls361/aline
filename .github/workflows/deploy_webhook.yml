@@ -21,25 +21,41 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Deploy to Hetzner
+      - name: Write .env and deploy
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          envs: ANTHROPIC_API_KEY,TAVILY_API_KEY,APOLLO_API_KEY,ATTIO_API_KEY,INSTANTLY_API_KEY,RAPIDAPI_KEY,SLACK_BOT_TOKEN,SLACK_APP_TOKEN,SLACK_WEBHOOK_HOT_LEADS,SLACK_WEBHOOK_NEWS,SLACK_WEBHOOK_DAILY,SLACK_WEBHOOK_ALERTS,SLACK_WEBHOOK_AGENT_COMMS
           script: |
             mkdir -p /opt/aline
             cd /opt/aline
 
-            # Pull latest code (preserve .env with secrets)
-            if [ -f .env ]; then cp .env /tmp/aline-env-backup; fi
+            # Write .env from GitHub secrets
+            printf '%s\n' \
+              "ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}" \
+              "TAVILY_API_KEY=${TAVILY_API_KEY}" \
+              "APOLLO_API_KEY=${APOLLO_API_KEY}" \
+              "ATTIO_API_KEY=${ATTIO_API_KEY}" \
+              "INSTANTLY_API_KEY=${INSTANTLY_API_KEY}" \
+              "RAPIDAPI_KEY=${RAPIDAPI_KEY}" \
+              "SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN}" \
+              "SLACK_APP_TOKEN=${SLACK_APP_TOKEN}" \
+              "SLACK_WEBHOOK_HOT_LEADS=${SLACK_WEBHOOK_HOT_LEADS}" \
+              "SLACK_WEBHOOK_NEWS=${SLACK_WEBHOOK_NEWS}" \
+              "SLACK_WEBHOOK_DAILY=${SLACK_WEBHOOK_DAILY}" \
+              "SLACK_WEBHOOK_ALERTS=${SLACK_WEBHOOK_ALERTS}" \
+              "SLACK_WEBHOOK_AGENT_COMMS=${SLACK_WEBHOOK_AGENT_COMMS}" \
+              > .env
+
+            # Pull latest code
             if [ -d .git ]; then
               git fetch origin && git reset --hard origin/main
             else
-              rm -rf /opt/aline/*
+              find . -maxdepth 1 ! -name '.env' ! -name '.' -exec rm -rf {} +
               git clone https://github.com/nuls361/aline.git .
             fi
-            if [ -f /tmp/aline-env-backup ] && [ ! -f .env ]; then cp /tmp/aline-env-backup .env; fi
 
             # Install dependencies
             apt-get update -qq && apt-get install -y -qq python3-pip > /dev/null 2>&1
@@ -65,3 +81,17 @@ jobs:
             systemctl restart slack_bot
 
             echo "Deployed: webhook_listener + email_agent (Mon-Fri 08:00) + slack_bot"
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          APOLLO_API_KEY: ${{ secrets.APOLLO_API_KEY }}
+          ATTIO_API_KEY: ${{ secrets.ATTIO_API_KEY }}
+          INSTANTLY_API_KEY: ${{ secrets.INSTANTLY_API_KEY }}
+          RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          SLACK_APP_TOKEN: ${{ secrets.SLACK_APP_TOKEN }}
+          SLACK_WEBHOOK_HOT_LEADS: ${{ secrets.SLACK_WEBHOOK_HOT_LEADS }}
+          SLACK_WEBHOOK_NEWS: ${{ secrets.SLACK_WEBHOOK_NEWS }}
+          SLACK_WEBHOOK_DAILY: ${{ secrets.SLACK_WEBHOOK_DAILY }}
+          SLACK_WEBHOOK_ALERTS: ${{ secrets.SLACK_WEBHOOK_ALERTS }}
+          SLACK_WEBHOOK_AGENT_COMMS: ${{ secrets.SLACK_WEBHOOK_AGENT_COMMS }}

@@ -40,7 +40,8 @@ jobs:
             fi
 
             # Install dependencies
-            pip3 install fastapi uvicorn requests anthropic tavily-python beautifulsoup4 slack-bolt
+            apt-get update -qq && apt-get install -y -qq python3-pip > /dev/null 2>&1
+            pip3 install --break-system-packages fastapi uvicorn requests anthropic tavily-python beautifulsoup4 slack-bolt
 
             # Deploy webhook listener
             cp webhook_listener.service /etc/systemd/system/webhook_listener.service

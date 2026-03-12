@@ -45,8 +45,10 @@ SKIP_TAVILY = False
 
 # --- Helpers ---
 
-def p(emoji: str, msg: str):
-    """Print with emoji prefix."""
+def p(emoji: str, msg: str, quiet: bool = False):
+    """Print with emoji prefix. If quiet=True, only print in verbose mode."""
+    if quiet and not VERBOSE:
+        return
     print(f"{emoji} {msg}")
 
 
@@ -60,7 +62,7 @@ def p_verbose(label: str, data):
 
 def fetch_jd(url: str) -> dict:
     """Fetch and parse a job description from URL."""
-    p("\U0001f4c4", f"Fetching JD from: {url}")
+    p("  ", f"Fetching JD from: {url}", quiet=True)
 
     try:
         resp = SESSION.get(url, timeout=15)
@@ -121,9 +123,9 @@ def fetch_jd(url: str) -> dict:
             body = soup.find("body")
             description = body.get_text(" ", strip=True)[:3000] if body else ""
 
-    p("\U0001f4c4", f"JD fetched: {title or '(no title)'} at {company or '(no company)'}")
+    p("✓", f"JD: {title or '(no title)'} at {company or '(no company)'}")
     if location:
-        p("  ", f"Location: {location}")
+        p("  ", f"Location: {location}", quiet=True)
 
     result = {
         "title": title,
@@ -141,7 +143,7 @@ def fetch_jd(url: str) -> dict:
 
 def enrich_company(company_name: str, company_url: str = "") -> dict:
     """Enrich company info via Tavily."""
-    p("\U0001f3e2", f"Enriching company: {company_name}")
+    p("  ", f"Enriching {company_name}...", quiet=True)
 
     # Extract domain from company URL if available
     known_domain = ""
@@ -153,7 +155,7 @@ def enrich_company(company_name: str, company_url: str = "") -> dict:
 
     results = []
     if SKIP_TAVILY:
-        p("⏭️", "Skipping Tavily (--no-tavily flag) — Claude-only enrichment")
+        p("  ", "Skipping Tavily — Claude-only enrichment", quiet=True)
     else:
         from tavily import TavilyClient
         tavily = TavilyClient(api_key=TAVILY_API_KEY)
@@ -202,9 +204,8 @@ Return JSON: {{"domain": "...", "headcount": "...", "funding_stage": "...", "one
                     # Prefer domain from JD structured data over Claude's guess
                     if known_domain:
                         info["domain"] = known_domain
-                    p("\U0001f3e2", f"Company: {company_name} | Domain: {info.get('domain', '?')} | "
-                      f"Size: ~{info.get('headcount', '?')} | Stage: {info.get('funding_stage', '?')}")
-                    p("  ", f"What they do: {info.get('one_liner', '?')}")
+                    p("✓", f"Company: {company_name} — {info.get('one_liner', '?')} ({info.get('funding_stage', '?')}, ~{info.get('headcount', '?')} people)")
+                    p("  ", f"Domain: {info.get('domain', '?')}", quiet=True)
                     return info
     except Exception as e:
         p("\u26a0\ufe0f", f"Claude enrichment failed: {e}")
@@ -216,7 +217,7 @@ Return JSON: {{"domain": "...", "headcount": "...", "funding_stage": "...", "one
 
 def classify_role(jd: dict) -> dict:
     """Use Claude to classify the role."""
-    p("\U0001f3f7\ufe0f", "Classifying role...")
+    p("  ", "Classifying role...", quiet=True)
 
     try:
         response = claude.messages.create(
@@ -243,11 +244,9 @@ Return JSON:
                 end = text.rfind("}")
                 if start != -1 and end != -1:
                     info = json.loads(text[start:end+1])
-                    p("\U0001f3f7\ufe0f", f"Role type: {info.get('engagement_type', '?')} | "
-                      f"Function: {info.get('role_function', '?')} | "
-                      f"Signal inferred: {info.get('signal_type', '?')}")
+                    p("✓", f"Role: {info.get('engagement_type', '?')} {info.get('role_function', '?')} — {info.get('signal_type', '?')}")
                     if info.get("reasoning"):
-                        p("  ", f"Reasoning: {info['reasoning']}")
+                        p("  ", f"Reasoning: {info['reasoning']}", quiet=True)
                     return info
     except Exception as e:
         p("\u274c", f"Classification failed: {e}")
@@ -260,7 +259,7 @@ Return JSON:
 def find_decision_maker(company_name: str, domain: str, role_info: dict,
                         skip_apollo: bool = False) -> dict:
     """Find the decision maker via Apollo and/or Tavily."""
-    p("\U0001f9e0", "Reasoning about decision maker...")
+    p("  ", "Finding decision maker...", quiet=True)
 
     signal = role_info.get("signal_type", "")
     engagement = role_info.get("engagement_type", "")
@@ -298,8 +297,7 @@ Return JSON:
                 end = text.rfind("}")
                 if start != -1 and end != -1:
                     targeting = json.loads(text[start:end+1])
-                    p("\U0001f9e0", f"Reasoning: {targeting.get('reasoning', '')}")
-                    p("\U0001f50d", f"Target titles: {targeting.get('target_titles', [])}")
+                    p("  ", f"Target: {targeting.get('target_titles', [])} — {targeting.get('reasoning', '')}", quiet=True)
                     break
         else:
             targeting = {"target_titles": ["CEO", "Founder"]}
@@ -309,7 +307,7 @@ Return JSON:
 
     # Apollo search
     if not skip_apollo and APOLLO_API_KEY and domain:
-        p("\U0001f50d", f"Apollo search: domain={domain}, titles={targeting['target_titles']}")
+        p("  ", f"Apollo search: domain={domain}, titles={targeting['target_titles']}", quiet=True)
         try:
             resp = SESSION.post(
                 "https://api.apollo.io/v1/mixed_people/search",
@@ -334,9 +332,9 @@ Return JSON:
                 linkedin = person.get("linkedin_url", "")
 
                 if email:
-                    p("\u2705", f"Decision maker found: {name}, {title} — {email}")
+                    p("✓", f"DM: {name}, {title} — {email}")
                 else:
-                    p("\u26a0\ufe0f", f"Found {name}, {title} but no email. LinkedIn: {linkedin}")
+                    p("✓", f"DM: {name}, {title} (no email, LinkedIn: {linkedin})")
 
                 return {
                     "name": name,
@@ -350,12 +348,11 @@ Return JSON:
         except Exception as e:
             p("\u26a0\ufe0f", f"Apollo search failed: {e}")
     elif skip_apollo:
-        p("\u23ed\ufe0f", "Skipping Apollo (--no-apollo flag)")
+        p("  ", "Skipping Apollo (--no-apollo flag)", quiet=True)
 
     # Fallback: Tavily search
     if SKIP_TAVILY:
-        p("⏭️", "Skipping Tavily people search (--no-tavily flag)")
-        p("⚠️", f"No decision maker found — using placeholder for demo")
+        p("✓", f"DM: {targeting['target_titles'][0]} (placeholder — no Tavily)")
         return {
             "name": f"[{targeting['target_titles'][0]}]",
             "title": targeting["target_titles"][0],
@@ -364,7 +361,7 @@ Return JSON:
             "source": "placeholder (--no-tavily)",
         }
 
-    p("\U0001f50d", f"Tavily fallback: searching for {targeting['target_titles'][0]} at {company_name}")
+    p("  ", f"Tavily fallback: searching for {targeting['target_titles'][0]} at {company_name}", quiet=True)
     from tavily import TavilyClient
     tavily = TavilyClient(api_key=TAVILY_API_KEY)
 
@@ -398,9 +395,9 @@ If not found, return {{"name": "", "title": "", "linkedin_url": "", "email": ""}
                     if start != -1 and end != -1:
                         person = json.loads(text[start:end+1])
                         if person.get("name"):
-                            p("\u2705", f"Found via Tavily: {person['name']}, {person.get('title', '')} — LinkedIn: {person.get('linkedin_url', 'N/A')}")
+                            p("✓", f"DM: {person['name']}, {person.get('title', '')} (via Tavily)")
                             if not person.get("email"):
-                                p("\u26a0\ufe0f", "No email found via Tavily. LinkedIn only.")
+                                p("  ", "No email found — LinkedIn only.", quiet=True)
                             person["source"] = "Tavily"
                             return person
     except Exception as e:
@@ -414,7 +411,7 @@ If not found, return {{"name": "", "title": "", "linkedin_url": "", "email": ""}
 
 def generate_email(jd: dict, company_info: dict, role_info: dict, dm: dict) -> dict:
     """Generate outreach email using Claude + soul.md + skill.md."""
-    p("\U0001f4e7", "Generating outreach email...")
+    p("  ", "Generating email...", quiet=True)
 
     with open(os.path.join(BASE_DIR, "soul.md")) as f:
         soul_md = f.read()
@@ -439,33 +436,32 @@ ENRICHMENT CONTEXT (use this — we did the research):
 - Domain: {company_info.get('domain', 'unknown')}
 - Location: {jd.get('location', 'DACH')}
 
+JOB DESCRIPTION (use specific details from this for the context hook):
+{jd.get('description', '')[:2000]}
+
 PITCH LOGIC — this is critical:
 - The posted role is: {role_info.get('engagement_type', 'Unknown')}
-- If the role is Full-time: position Aline's fractional/interim executive as a BRIDGE solution. The angle is: "While you search for the permanent hire, we can place a fractional executive who has done this before — starts Monday, owns the function from day one, de-risks the transition."
+- If the role is Full-time: position Aline's fractional/interim executive as a BRIDGE. The angle is: "While you search for the permanent {jd.get('title', 'hire')}, we can place a fractional who has done this before — starts Monday, keeps the function moving until the permanent hire is in seat."
 - If the role is Fractional or Interim: pitch directly. We are the perfect fit. No bridge framing needed.
-- Always translate the role into Aline's language: we place operators, not candidates.
-- IMPORTANT: Match the executive type to the DECISION MAKER who would hire for this role, not the role function itself. Examples:
-  - Data Science / Analytics role → the buyer is the CTO or VP Engineering → pitch a fractional CTO
-  - Sales role → the buyer is the CEO or CRO → pitch a fractional Sales/Revenue leader
-  - Finance role → the buyer is the CEO → pitch a fractional CFO
-  Think about who OWNS this hire and what Aline executive type maps to that buyer's need.
+- CRITICAL: Match the offer to the ROLE being hired, not the buyer. If they are hiring a Senior Fullstack Engineer, offer a fractional senior engineer or engineering lead — never jump to CTO or VP Eng. If they are hiring a Head of Sales, offer a fractional Head of Sales. Never pitch up. Never pitch down.
 
 STRUCTURE (follow this order):
 1. Greeting: "Hi [First Name]," — always use the decision maker's first name.
-2. Context hook (1–2 sentences): Show you did the homework. Reference the specific role AND something about the company (what they do, their stage, a recent event). Not just "I saw you're hiring X." Example: "I noticed Peec is hiring a Head of Sales — scaling an AI sales team post-Series A is one of the harder builds to get right."
-3. The insight (1 sentence): Why this moment matters. Connect the signal to a challenge they likely face. Example: "Getting a senior sales leader wrong at this stage costs you two quarters."
-4. Bridge/pitch (1–2 sentences): Position the fractional/interim exec as the solution. Be specific about what they would own. Example: "We place fractional CROs who have built this function before — they can own pipeline, process, and first hires while you run the permanent search."
-5. Social proof (1 sentence): Weave it in naturally, connected to their situation. Not a standalone logo dump. Our partners have operated at Microsoft, Deutsche Bank, Oda, and Zalando — pick the one or two most relevant to the recipient's industry or stage. Example: "Our partners have built sales orgs at Zalando and Oda — same stage, same velocity."
-6. CTA + sign-off: include the booking link https://cal.com/niels-zanotto/30min. End with "Best, Niels".
+2. Context hook (1–2 sentences): Open with a SPECIFIC detail from the job posting — not the job title. Reference something from inside the JD: the tech stack, team size, growth context, a requirement that reveals what the company is building. Never open with "I saw you're hiring X."
+3. Aline introduction (1 sentence): Tell the reader who you are. Example: "We're Aline — we place fractional and interim executives into DACH tech teams." Keep it factual, one line, no superlatives.
+4. Bridge/offer (1–2 sentences): Position the fractional exec as continuity while the permanent search runs. Be specific about what the fractional would own. Frame it as: the fractional keeps the function moving so the search is not rushed. We do not make the permanent hire — we bridge the gap.
+5. Social proof (1 sentence): Reference where our partners have WORKED, not claim we have similar clients. Pick from [Microsoft, Deutsche Bank, Oda, Zalando] — most relevant to the recipient's industry. Do NOT say "same stage" or "same velocity" unless the comparison is actually accurate.
+6. CTA + sign-off: Ask one yes/no question that reveals intent. Then: "If so: https://cal.com/niels-zanotto/30min". End with "Best, Niels".
 
 Rules:
-- 6–8 sentences in the body (excluding greeting and sign-off). ~100–150 words. Not shorter.
-- The context hook MUST use enrichment data (company one-liner, stage, domain). Show the research.
-- Social proof must connect to the recipient's industry or stage, not be a standalone line.
-- Tone: a sharp partner writing to a peer, not a sales automation.
-- Write complete, professional sentences. Never drop the subject ("I", "We"). Not sloppy-casual.
-- No "I hope this finds you well". No "Dear Sir/Madam".
-- Subject line: max 8 words, no clickbait.
+- 5–7 sentences in the body (excluding greeting and sign-off). ~80–130 words.
+- Context hook MUST reference a specific detail from inside the JD, not just the job title.
+- OBSERVE, do not diagnose. You are external — state what you see ("you're building X"), not what you assume ("this is causing you pain"). Never tell the reader what their problems are.
+- Social proof must connect to the recipient's industry or function. Never claim "same stage" unless factually accurate.
+- Tone: a knowledgeable peer writing to another peer. Not a salesperson diagnosing pain.
+- Write complete, professional sentences. Never drop the subject ("I", "We").
+- No "I hope this finds you well". No "Dear Sir/Madam". No "I saw you're hiring [title]" as an opener.
+- Subject line: max 8 words, no clickbait. Refer to the situation, not the offer.
 - Language: English unless company is clearly German-only (check domain/name).
 
 Return JSON:
@@ -483,12 +479,6 @@ Return JSON:
                 end = text.rfind("}")
                 if start != -1 and end != -1:
                     email_data = json.loads(text[start:end+1])
-                    p("\U0001f4e7", f"Subject: {email_data.get('subject', '')}")
-                    print()
-                    p("\U0001f4dd", "Body:")
-                    print(email_data.get("body", ""))
-                    print()
-                    p("\U0001f4a1", f"Reasoning: {email_data.get('reasoning', '')}")
                     return email_data
     except Exception as e:
         p("\u274c", f"Email generation failed: {e}")
@@ -499,19 +489,23 @@ Return JSON:
 # --- Step 6: Summary ---
 
 def print_summary(jd: dict, dm: dict, email_data: dict):
-    """Print what would have happened in live mode."""
+    """Print the final output: email + metadata."""
     print()
     print("=" * 60)
-    p("\U0001f6ab", "DRY RUN — nothing was sent or written.")
-    print()
-    if dm.get("email"):
-        p("  ", f"Would have: added {dm.get('name', dm['email'])} to Instantly campaign")
-    else:
-        p("  ", f"Would have: searched for email for {dm.get('name', 'unknown')}")
-    p("  ", "Would have: updated Attio role → sdr_contacted")
-    p("  ", "Would have: sent Slack alert to #aline-hot-leads")
     if email_data.get("subject"):
-        p("  ", f"Would have: sent email with subject \"{email_data['subject']}\"")
+        print(f"  Subject: {email_data['subject']}")
+        print("=" * 60)
+        print()
+        print(email_data.get("body", ""))
+        print()
+        print("-" * 60)
+        print(f"  Pitch: {email_data.get('pitch_type', '?')} | {email_data.get('reasoning', '')}")
+        print(f"  To: {dm.get('name', '?')} ({dm.get('title', '?')}) — {dm.get('email', 'no email')}")
+        print(f"  Role: {jd.get('title', '?')} at {jd.get('company', '?')}")
+        print("-" * 60)
+        print("  DRY RUN — nothing was sent.")
+    else:
+        print("  No email generated.")
     print("=" * 60)
 
 
@@ -541,29 +535,22 @@ def main():
         sys.exit(1)
 
     print()
-    print("=" * 60)
-    print("  ALINE DRY RUN — Full Pipeline Test")
-    print("=" * 60)
-    print()
 
     # Step 1: Fetch JD
     jd = fetch_jd(args.url)
     if not jd.get("title") and not jd.get("description"):
-        p("\u274c", "Could not extract JD content. Aborting.")
+        p("✗", "Could not extract JD content. Aborting.")
         sys.exit(1)
-    print()
 
     # Step 2: Enrich company
     company_info = {}
     if jd.get("company"):
         company_info = enrich_company(jd["company"], jd.get("company_url", ""))
     else:
-        p("\u26a0\ufe0f", "No company name found in JD, skipping enrichment")
-    print()
+        p("⚠️", "No company name found in JD, skipping enrichment")
 
     # Step 3: Classify role
     role_info = classify_role(jd)
-    print()
 
     # Step 4: Find decision maker
     domain = company_info.get("domain", "")
@@ -573,13 +560,11 @@ def main():
         role_info=role_info,
         skip_apollo=args.no_apollo,
     )
-    print()
 
     # Step 5: Generate email
     email_data = generate_email(jd, company_info, role_info, dm)
-    print()
 
-    # Step 6: Summary
+    # Step 6: Output
     print_summary(jd, dm, email_data)
 
 

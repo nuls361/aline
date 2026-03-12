@@ -33,8 +33,9 @@ jobs:
 
             # Pull latest code
             if [ -d .git ]; then
-              git pull
+              git fetch origin && git reset --hard origin/main
             else
+              rm -rf /opt/aline/*
               git clone https://github.com/nuls361/aline.git .
             fi
 

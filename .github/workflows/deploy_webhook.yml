@@ -81,16 +81,23 @@ jobs:
             systemctl enable slack_bot
             systemctl restart slack_bot
 
-            # Wait and check if services are running
-            sleep 3
-            echo "=== slack_bot status ==="
+            echo "Deployed"
+
+      - name: Health check
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            sleep 5
+            echo "=== slack_bot ==="
             systemctl is-active slack_bot || true
-            journalctl -u slack_bot --no-pager -n 20 || true
-            echo "=== webhook_listener status ==="
-            systemctl is-active webhook_listener || true
-            echo "=== .env check ==="
+            journalctl -u slack_bot --no-pager -n 30
+            echo "=== .env line count ==="
             wc -l /opt/aline/.env
-            echo "Deployed: webhook_listener + email_agent (Mon-Fri 08:00) + slack_bot"
+            echo "=== .env keys present ==="
+            grep -c '=' /opt/aline/.env || true
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}

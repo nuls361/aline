@@ -84,20 +84,22 @@ jobs:
             echo "Deployed"
 
       - name: Health check
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          script: |
-            sleep 5
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          echo "$VPS_SSH_KEY" > /tmp/ssh_key && chmod 600 /tmp/ssh_key
+          sleep 5
+          ssh -o StrictHostKeyChecking=no -i /tmp/ssh_key "$VPS_USER@$VPS_HOST" '
             echo "=== slack_bot ==="
             systemctl is-active slack_bot || true
-            journalctl -u slack_bot --no-pager -n 30
-            echo "=== .env line count ==="
+            journalctl -u slack_bot --no-pager -n 30 2>&1
+            echo "=== .env ==="
             wc -l /opt/aline/.env
-            echo "=== .env keys present ==="
-            grep -c '=' /opt/aline/.env || true
+            grep -c "=" /opt/aline/.env || true
+          '
+          rm -f /tmp/ssh_key
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}

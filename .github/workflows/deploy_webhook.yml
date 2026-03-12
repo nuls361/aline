@@ -31,13 +31,15 @@ jobs:
             mkdir -p /opt/aline
             cd /opt/aline
 
-            # Pull latest code
+            # Pull latest code (preserve .env with secrets)
+            if [ -f .env ]; then cp .env /tmp/aline-env-backup; fi
             if [ -d .git ]; then
               git fetch origin && git reset --hard origin/main
             else
               rm -rf /opt/aline/*
               git clone https://github.com/nuls361/aline.git .
             fi
+            if [ -f /tmp/aline-env-backup ] && [ ! -f .env ]; then cp /tmp/aline-env-backup .env; fi
 
             # Install dependencies
             apt-get update -qq && apt-get install -y -qq python3-pip > /dev/null 2>&1

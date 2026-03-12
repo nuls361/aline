@@ -1,0 +1,24 @@
+name: Check Slack Bot Logs
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check logs
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          echo "$VPS_SSH_KEY" > /tmp/ssh_key && chmod 600 /tmp/ssh_key
+          ssh -o StrictHostKeyChecking=no -i /tmp/ssh_key "$VPS_USER@$VPS_HOST" '
+            echo "=== status ==="
+            systemctl is-active slack_bot
+            echo "=== last 50 lines ==="
+            journalctl -u slack_bot --no-pager -n 50 2>&1
+            echo "=== .env SLACK keys ==="
+            grep "SLACK_" /opt/aline/.env | awk -F= "{print \$1, length(\$2)}"
+          '
+          rm -f /tmp/ssh_key

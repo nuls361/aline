@@ -80,6 +80,15 @@ jobs:
             systemctl enable slack_bot
             systemctl restart slack_bot
 
+            # Wait and check if services are running
+            sleep 3
+            echo "=== slack_bot status ==="
+            systemctl is-active slack_bot || true
+            journalctl -u slack_bot --no-pager -n 20 || true
+            echo "=== webhook_listener status ==="
+            systemctl is-active webhook_listener || true
+            echo "=== .env check ==="
+            wc -l /opt/aline/.env
             echo "Deployed: webhook_listener + email_agent (Mon-Fri 08:00) + slack_bot"
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

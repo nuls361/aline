@@ -24,5 +24,9 @@ jobs:
             cd /opt/aline && git log --oneline -3 2>&1
             echo "=== email prompt check ==="
             grep -c "WHO WE ARE" /opt/aline/dry_run.py 2>&1 || echo "OLD PROMPT"
+            echo "=== bot process start time ==="
+            systemctl show slack_bot --property=ActiveEnterTimestamp 2>&1
+            echo "=== last 80 lines ==="
+            journalctl -u slack_bot --no-pager -n 80 2>&1
           '
           rm -f /tmp/ssh_key

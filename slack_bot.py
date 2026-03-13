@@ -134,20 +134,13 @@ def handle_message(event, say):
     """Listen for messages containing JD URLs."""
     subtype = event.get("subtype")
 
-    # For message_changed (Slack URL unfurling), extract from the edited message
-    if subtype == "message_changed":
-        message = event.get("message", {})
-        # Ignore if the edit is from a bot
-        if message.get("bot_id"):
-            return
-        text = message.get("text", "")
-        ts = message.get("ts", event.get("ts", ""))
-    elif subtype:
-        # Ignore other subtypes (bot messages, deletions, etc.)
+    # Only process original messages — ignore message_changed (URL unfurling),
+    # bot messages, deletions, etc. The original message already has the URL.
+    if subtype:
         return
-    else:
-        text = event.get("text", "")
-        ts = event.get("ts", "")
+
+    text = event.get("text", "")
+    ts = event.get("ts", "")
 
     channel = event.get("channel", "")
     log.info(f"Message received: subtype={subtype} text={text[:200]}")

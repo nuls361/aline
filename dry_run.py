@@ -234,6 +234,7 @@ Return JSON:
   "engagement_type": "Interim" or "Fractional" or "Full-time",
   "role_function": "Finance" or "Technology" or "Operations" or "People" or "Product" or "Marketing" or "Sales" or "General Management",
   "signal_type": infer the likely signal (e.g. "Leadership Departure", "Funding Round", "Restructuring", "Growth Hire", "International Expansion"),
+  "uses_agency": true if the JD mentions contacting a recruiter/agency to apply (e.g. "talk to Alex", "contact our recruitment partner", "apply through [agency name]") — false otherwise,
   "reasoning": "one sentence explaining your classification"
 }}"""}],
         )
@@ -439,30 +440,48 @@ ENRICHMENT CONTEXT (use this — we did the research):
 JOB DESCRIPTION (use specific details from this for the context hook):
 {jd.get('description', '')[:2000]}
 
-PITCH LOGIC — this is critical:
-- The posted role is: {role_info.get('engagement_type', 'Unknown')}
-- If the role is Full-time: position Aline's fractional/interim executive as a BRIDGE. The angle is: "While you search for the permanent {jd.get('title', 'hire')}, we can place a fractional who has done this before — starts Monday, keeps the function moving until the permanent hire is in seat."
-- If the role is Fractional or Interim: pitch directly. We are the perfect fit. No bridge framing needed.
-- CRITICAL: Match the offer to the ROLE being hired, not the buyer. If they are hiring a Senior Fullstack Engineer, offer a fractional senior engineer or engineering lead — never jump to CTO or VP Eng. If they are hiring a Head of Sales, offer a fractional Head of Sales. Never pitch up. Never pitch down.
+WHO WE ARE (weave this in naturally, don't copy-paste):
+Aline is a team of former talent executives from companies like Zalando, Microsoft, Deutsche Bank, and Oda. We do interim, fractional, and executive hiring for companies that are scaling.
 
-STRUCTURE (follow this order):
-1. Greeting: "Hi [First Name]," — always use the decision maker's first name.
-2. Context hook (1–2 sentences): Open with a SPECIFIC detail from the job posting — not the job title. Reference something from inside the JD: the tech stack, team size, growth context, a requirement that reveals what the company is building. Never open with "I saw you're hiring X."
-3. Aline introduction (1 sentence): Tell the reader who you are. Example: "We're Aline — we place fractional and interim executives into DACH tech teams." Keep it factual, one line, no superlatives.
-4. Bridge/offer (1–2 sentences): Position the fractional exec as continuity while the permanent search runs. Be specific about what the fractional would own. Frame it as: the fractional keeps the function moving so the search is not rushed. We do not make the permanent hire — we bridge the gap.
-5. Social proof (1 sentence): Reference where our partners have WORKED, not claim we have similar clients. Pick from [Microsoft, Deutsche Bank, Oda, Zalando] — most relevant to the recipient's industry. Do NOT say "same stage" or "same velocity" unless the comparison is actually accurate.
-6. CTA + sign-off: Ask one yes/no question that reveals intent. Then: "If so: https://cal.com/niels-zanotto/30min". End with "Best, Niels".
+PITCH LOGIC:
+- The posted role is: {role_info.get('engagement_type', 'Unknown')}
+- If Full-time: mention we have candidates who could fit, and suggest a call to discuss. Don't go deep on the fractional model in the email — save that for the meeting.
+- If Fractional or Interim: pitch directly. We are a perfect fit. Mention we have relevant candidates.
+- Match the offer to the ROLE being hired. If they hire a Senior Engineer, talk about senior engineers. Never jump to CTO/VP Eng. Never pitch up or down.
+- AGENCY CHECK: {role_info.get('uses_agency', False)}. If the JD mentions applying through an agency or recruiter, acknowledge it — e.g. "I noticed you're working with a recruiter on this. We sometimes complement that with [our angle]." Don't ignore it.
+
+HOW TO WRITE THE EMAIL:
+Write like a real person sending a quick email to someone they respect. NOT a template. NOT a sales sequence. Think: you're a talent exec who found an interesting role and wants to reach out casually.
+
+Good example (use the VIBE, not the exact words):
+"Hi Hannes, I came across the fractional legal counsel role — sounds like an interesting setup. I think we have a handful of candidates who could be a good fit. We're Aline, a bunch of former Zalando and Deutsche Bank talent execs. We do interim, fractional and executive hiring for companies that are scaling. Should we jump on a call in the next few days to talk about the candidates?"
+
+What makes this good:
+- Casual, human tone
+- Shows you know the role (brief reference)
+- Introduces Aline naturally (who we are, not what we sell)
+- CTA is a simple "should we chat" — not a diagnostic question
+- No promises about what a candidate would "own" or "build"
+- No rigid structure — reads like a real email
+
+BAD patterns to avoid:
+- "We're Aline — we place fractional and interim executives into DACH tech teams." (too salesy)
+- "They'd own pipeline, messaging, and first revenue while you find the right long-term fit." (too specific, presumptuous)
+- "Our partners have led GTM at Oda, Zalando, and similar product-led teams." (fake claim)
+- "building interactive interfaces for billion-document repositories" (no human writes like this)
+- "Do you have legal capacity in place right now?" (diagnostic question — not your business)
+- Any opener starting with "I saw you're hiring X"
 
 Rules:
-- 5–7 sentences in the body (excluding greeting and sign-off). ~80–130 words.
-- Context hook MUST reference a specific detail from inside the JD, not just the job title.
-- OBSERVE, do not diagnose. You are external — state what you see ("you're building X"), not what you assume ("this is causing you pain"). Never tell the reader what their problems are.
-- Social proof must connect to the recipient's industry or function. Never claim "same stage" unless factually accurate.
-- Tone: a knowledgeable peer writing to another peer. Not a salesperson diagnosing pain.
-- Write complete, professional sentences. Never drop the subject ("I", "We").
-- No "I hope this finds you well". No "Dear Sir/Madam". No "I saw you're hiring [title]" as an opener.
-- Subject line: max 8 words, no clickbait. Refer to the situation, not the offer.
-- Language: English unless company is clearly German-only (check domain/name).
+- 4–6 sentences. ~60–100 words. Keep it SHORT.
+- Reference something specific about the COMPANY or ROLE so they know you did your homework — but keep it natural, one clause, not a paragraph.
+- Introduce Aline as who we are (former talent execs from [companies]), not what we sell.
+- Social proof = where our TEAM comes from, not where our "partners have led [function]." We are former talent execs from these companies. That's it.
+- CTA: "Should we jump on a call?" or "Happy to share profiles if useful." Then: "https://cal.com/niels-zanotto/30min". End with "Best, Niels".
+- Tone: casual, peer-to-peer, confident but not pushy. Like you're texting a professional contact.
+- Subject line: max 6 words. Casual. Reference the role or company.
+- Language: English unless company is clearly German-only.
+- Every email should feel DIFFERENT. Vary sentence structure, length, and order. No two emails should read the same.
 
 Return JSON:
 {{

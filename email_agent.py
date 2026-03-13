@@ -205,7 +205,7 @@ def execute_tools(content_blocks) -> list[dict]:
 
 
 # --- Claude API call with retry ---
-def call_claude(system_prompt: str, messages: list, tools=None, max_tokens: int = 4096):
+def call_claude(system_prompt: str, messages: list, tools=None, max_tokens: int = 4096, temperature: float = None):
     for attempt in range(3):
         try:
             kwargs = {
@@ -214,6 +214,8 @@ def call_claude(system_prompt: str, messages: list, tools=None, max_tokens: int 
                 "system": system_prompt,
                 "messages": messages,
             }
+            if temperature is not None:
+                kwargs["temperature"] = temperature
             if tools:
                 kwargs["tools"] = tools
             return claude.messages.create(**kwargs)
@@ -319,27 +321,32 @@ def generate_email(role: dict, decision_maker: dict) -> dict | None:
 Context:
 - Role: {role_title} at {company_name}
 - Signal: {signal_summary}
-- Match the role level — never pitch up (e.g. don't offer a CTO for an engineer role)
+- Match the role level, never pitch up (e.g. don't offer a CTO for an engineer role)
 
-Here are 3 example emails. Vary your structure — don't copy one template:
+These examples show the TONE and LENGTH, not a template. Do NOT copy their structure. Write something fresh each time. Vary the opening, the order, the phrasing. Surprise me.
 
-EXAMPLE A (fractional role, shortest):
-Hi Hannes, I came across the fractional legal counsel role. I think we have a few candidates who could be a good fit. We're Aline — an AI-driven search firm built by former Zalando and Deutsche Bank talent execs. We do interim, fractional, and executive hiring for scaling teams. Should we hop on a call this week? https://cal.com/niels-zanotto/30min Best, Niels
+EXAMPLE A:
+Hi Hannes, I came across the fractional legal counsel role. I think we have a few candidates who could be a good fit. We're Aline, an AI-driven search firm built by former Zalando and Deutsche Bank talent execs. We do interim, fractional, and executive hiring for scaling teams. Should we hop on a call this week? https://cal.com/niels-zanotto/30min Best, Niels
 
-EXAMPLE B (full-time role, just offer to help):
-Hi Sarah, saw the Head of Engineering opening at Cometa. We're Aline — an AI-driven search firm founded by former Microsoft, Zalando, and Oda talent execs. We work with DACH tech teams on senior hires like this and I think we have some interesting profiles worth showing you. Happy to share them if useful — here's my calendar: https://cal.com/niels-zanotto/30min Best, Niels
+EXAMPLE B:
+Hi Sarah, saw the Head of Engineering opening at Cometa. We're Aline, an AI-driven search firm. Our team comes from Microsoft, Zalando, and Oda. We work with DACH tech teams on senior hires like this and I think we have some interesting profiles worth showing you. Happy to share them over a call: https://cal.com/niels-zanotto/30min Best, Niels
 
-EXAMPLE C (short and direct):
-Hi Tom, the VP Sales role caught my eye. We're Aline — an AI-driven search firm built by former Zalando, Deutsche Bank, and Microsoft talent execs. We help scaling companies fill exactly these kinds of roles. Want to jump on a quick call? https://cal.com/niels-zanotto/30min Best, Niels
+EXAMPLE C:
+Hi Tom, we noticed your VP Sales opening. We're Aline. We help scaling companies hire for exactly these kinds of roles, and our team comes from Zalando, Deutsche Bank, and Microsoft. Want to jump on a quick call? https://cal.com/niels-zanotto/30min Best, Niels
 
-HARD RULES — break any of these and the email is useless:
-1. Write like a human. No pseudo-analysis, no insight theater, no brand speak.
-2. Always introduce Aline by name: "We're Aline — former [companies] talent execs." Never skip the name.
-3. "We" not "my team". Only claim where the team COMES FROM (Zalando, Deutsche Bank, Microsoft, Oda) — never what they "led" or "placed".
+EXAMPLE D:
+Hi Lisa, I saw HelloBetter is looking for a Head of People. That's right in our wheelhouse. We're Aline, an AI-driven search firm founded by former Zalando and Deutsche Bank talent execs. I think we could send over a few strong profiles. Here's my calendar if you want to chat: https://cal.com/niels-zanotto/30min Best, Niels
+
+HARD RULES:
+1. Write like a human typing a quick email. No pseudo-analysis, no insight theater, no brand speak.
+2. Always introduce Aline by name. Never skip who we are.
+3. "We" not "my team". Only claim where the team COMES FROM (Zalando, Deutsche Bank, Microsoft, Oda). Never what they "led" or "placed".
 4. Mention what the company does only if it fits naturally in one clause. Don't rephrase the JD.
-5. Match the role level — never pitch up.
-6. For full-time roles: just offer to help fill the role. Do NOT mention fractional, interim, or bridge — save that for the call.
+5. Match the role level. Never pitch up.
+6. For full-time roles: just offer to help fill the role. Do NOT mention fractional, interim, or bridge.
 7. Under 100 words. End with casual CTA + https://cal.com/niels-zanotto/30min + "Best, Niels"
+8. NEVER use em dashes. No "—" anywhere. Use commas, periods, or "and" instead.
+9. Do NOT copy an example. Write a new email that sounds different every time.
 
 Subject line: max 6 words, lowercase feel, no clickbait.
 
@@ -351,9 +358,10 @@ Return JSON:
 }}}}"""
 
     response = call_claude(
-        system_prompt="You are Niels writing a quick outreach email. Write like a normal person — not a copywriter, not a brand strategist. Return only valid JSON.",
+        system_prompt="You are Niels writing a quick outreach email. Write like a normal person, not a copywriter, not a brand strategist. Return only valid JSON.",
         messages=[{"role": "user", "content": prompt}],
         max_tokens=1024,
+        temperature=1,
     )
 
     for block in response.content:

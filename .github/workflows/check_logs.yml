@@ -20,5 +20,9 @@ jobs:
             journalctl -u slack_bot --no-pager -n 50 2>&1
             echo "=== .env SLACK keys ==="
             grep "SLACK_" /opt/aline/.env | awk -F= "{print \$1, length(\$2)}"
+            echo "=== git log ==="
+            cd /opt/aline && git log --oneline -3 2>&1
+            echo "=== email prompt check ==="
+            grep -c "WHO WE ARE" /opt/aline/dry_run.py 2>&1 || echo "OLD PROMPT"
           '
           rm -f /tmp/ssh_key

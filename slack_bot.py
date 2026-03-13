@@ -14,6 +14,7 @@ Required env vars:
 import os
 import re
 import logging
+import threading
 import anthropic
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
@@ -50,8 +51,9 @@ JD_URL_PATTERN = re.compile(
 
 app = App(token=SLACK_BOT_TOKEN)
 
-# Track processed message timestamps to avoid duplicates
+# Track processed message timestamps to avoid duplicates (thread-safe)
 _processed_ts = set()
+_processed_lock = threading.Lock()
 
 
 def run_pipeline(url: str) -> dict:
@@ -149,13 +151,14 @@ def handle_message(event, say):
     channel = event.get("channel", "")
     log.info(f"Message received: subtype={subtype} text={text[:200]}")
 
-    # Dedup: skip if we already processed this message
-    if ts in _processed_ts:
-        return
-    _processed_ts.add(ts)
-    # Keep set from growing forever
-    if len(_processed_ts) > 1000:
-        _processed_ts.clear()
+    # Dedup: skip if we already processed this message (thread-safe)
+    with _processed_lock:
+        if ts in _processed_ts:
+            log.info(f"Skipping duplicate ts={ts}")
+            return
+        _processed_ts.add(ts)
+        if len(_processed_ts) > 1000:
+            _processed_ts.clear()
 
     # Slack wraps URLs like <https://...|label> or <https://...>
     slack_urls = re.findall(r"<(https?://[^|>]+)(?:\|[^>]*)?>", text)

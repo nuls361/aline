@@ -158,16 +158,12 @@ def handle_message(event, say):
         _processed_ts.clear()
 
     # Slack wraps URLs like <https://...|label> or <https://...>
-    # Extract raw URLs from Slack's formatting first
     slack_urls = re.findall(r"<(https?://[^|>]+)(?:\|[^>]*)?>", text)
-    raw_text = text  # also check the raw text in case
-    all_urls = slack_urls + JD_URL_PATTERN.findall(raw_text)
+    # Clean Slack's HTML encoding and strip fragments
+    slack_urls = [u.replace("&amp;", "&").split("#")[0] for u in slack_urls]
 
     # Filter to JD URLs only
-    urls = []
-    for u in all_urls:
-        if JD_URL_PATTERN.match(u):
-            urls.append(u)
+    urls = [u for u in slack_urls if JD_URL_PATTERN.match(u)]
 
     log.info(f"URLs found: {urls}")
 

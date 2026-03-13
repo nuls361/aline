@@ -29,6 +29,7 @@ log = logging.getLogger(__name__)
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 APOLLO_API_KEY = os.environ.get("APOLLO_API_KEY", "")
 TAVILY_API_KEY = os.environ.get("TAVILY_API_KEY", "")
+PERPLEXITY_API_KEY = os.environ.get("PERPLEXITY_API_KEY", "")
 ATTIO_API_KEY = os.environ.get("ATTIO_API_KEY", "")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -42,6 +43,27 @@ SESSION.headers.update({
 
 VERBOSE = False
 SKIP_TAVILY = False
+
+
+def perplexity_ask(query: str) -> str:
+    """Ask Perplexity Sonar a question, return the text answer."""
+    if not PERPLEXITY_API_KEY:
+        return ""
+    try:
+        resp = SESSION.post(
+            "https://api.perplexity.ai/chat/completions",
+            headers={"Authorization": f"Bearer {PERPLEXITY_API_KEY}"},
+            json={
+                "model": "sonar",
+                "messages": [{"role": "user", "content": query}],
+            },
+            timeout=20,
+        )
+        resp.raise_for_status()
+        return resp.json()["choices"][0]["message"]["content"]
+    except Exception as e:
+        p("⚠️", f"Perplexity failed: {e}")
+        return ""
 
 # --- Helpers ---
 
@@ -142,7 +164,7 @@ def fetch_jd(url: str) -> dict:
 # --- Step 2: Enrich company ---
 
 def enrich_company(company_name: str, company_url: str = "") -> dict:
-    """Enrich company info via Tavily."""
+    """Enrich company info via Perplexity (primary) or Tavily (fallback)."""
     p("  ", f"Enriching {company_name}...", quiet=True)
 
     # Extract domain from company URL if available
@@ -153,43 +175,51 @@ def enrich_company(company_name: str, company_url: str = "") -> dict:
         known_domain = parsed.netloc or parsed.path
         known_domain = known_domain.removeprefix("www.")
 
-    results = []
-    if SKIP_TAVILY:
-        p("  ", "Skipping Tavily — Claude-only enrichment", quiet=True)
-    else:
+    # Try Perplexity first
+    perplexity_context = ""
+    if PERPLEXITY_API_KEY:
+        p("  ", "Using Perplexity for enrichment...", quiet=True)
+        perplexity_context = perplexity_ask(
+            f"What does {company_name} do? Include: company website/domain, "
+            f"approximate number of employees, funding stage (e.g. Series A/B/C, "
+            f"bootstrapped), and a one-line description of what the company does. "
+            f"Keep it brief and factual."
+        )
+        p_verbose("Perplexity company result", perplexity_context)
+
+    # Tavily fallback if no Perplexity
+    tavily_context = ""
+    if not perplexity_context and not SKIP_TAVILY and TAVILY_API_KEY:
         from tavily import TavilyClient
         tavily = TavilyClient(api_key=TAVILY_API_KEY)
-
         try:
             resp = tavily.search(
                 query=f"{company_name} company domain website funding employees DACH",
-                max_results=3,
-                days=30,
+                max_results=3, days=30,
             )
             results = resp.get("results", [])
             p_verbose("Tavily company results", results)
+            tavily_context = "\n".join([
+                f"- {r.get('title', '')}: {r.get('content', '')[:300]}"
+                for r in results
+            ])
         except Exception as e:
-            p("\u26a0\ufe0f", f"Tavily search failed: {e}")
-            results = []
+            p("⚠️", f"Tavily search failed: {e}")
 
-    # Use Claude to extract structured info
-    context = "\n".join([
-        f"- {r.get('title', '')}: {r.get('content', '')[:300]}"
-        for r in results
-    ])
+    context = perplexity_context or tavily_context or ""
 
     try:
         response = claude.messages.create(
             model="claude-sonnet-4-5-20250929",
             max_tokens=512,
             system="Extract company info. Return only valid JSON.",
-            messages=[{"role": "user", "content": f"""From these search results about "{company_name}", extract:
+            messages=[{"role": "user", "content": f"""From this research about "{company_name}", extract:
 - domain (company website domain, e.g. acme.de)
 - headcount_estimate (number or "unknown")
 - funding_stage (e.g. "Series A", "Series B", "Bootstrapped", "unknown")
 - one_liner (what the company does, max 10 words)
 
-Search results:
+Research:
 {context}
 
 Return JSON: {{"domain": "...", "headcount": "...", "funding_stage": "...", "one_liner": "..."}}"""}],
@@ -351,15 +381,54 @@ Return JSON:
     elif skip_apollo:
         p("  ", "Skipping Apollo (--no-apollo flag)", quiet=True)
 
-    # Fallback: Tavily search
-    if SKIP_TAVILY:
-        p("✓", f"DM: {targeting['target_titles'][0]} (placeholder — no Tavily)")
+    # Perplexity search (primary)
+    if PERPLEXITY_API_KEY:
+        target_title = targeting["target_titles"][0]
+        p("  ", f"Perplexity: searching for {target_title} at {company_name}", quiet=True)
+        pplx_result = perplexity_ask(
+            f"Who is the {target_title} of {company_name}? "
+            f"I need their full name, exact job title, and LinkedIn profile URL. "
+            f"Only return someone who currently works at {company_name}. "
+            f"Keep the answer brief and factual."
+        )
+        p_verbose("Perplexity DM result", pplx_result)
+
+        if pplx_result:
+            extract_resp = claude.messages.create(
+                model="claude-sonnet-4-5-20250929",
+                max_tokens=256,
+                system="Extract person info. Return only valid JSON.",
+                messages=[{"role": "user", "content": f"""From this research, extract the {target_title} of {company_name}.
+
+CRITICAL: The person MUST actually work at {company_name}. Do NOT return people who work at other companies.
+
+Research:
+{pplx_result}
+
+Return JSON: {{"name": "...", "title": "...", "linkedin_url": "...", "email": ""}}
+If not found, return {{"name": "", "title": "", "linkedin_url": "", "email": ""}}"""}],
+            )
+            for block in extract_resp.content:
+                if hasattr(block, "text"):
+                    text = block.text.strip()
+                    start = text.find("{")
+                    end = text.rfind("}")
+                    if start != -1 and end != -1:
+                        person = json.loads(text[start:end+1])
+                        if person.get("name"):
+                            p("✓", f"DM: {person['name']}, {person.get('title', '')} (via Perplexity)")
+                            person["source"] = "Perplexity"
+                            return person
+
+    # Tavily fallback
+    if SKIP_TAVILY or not TAVILY_API_KEY:
+        p("✓", f"DM: {targeting['target_titles'][0]} (placeholder)")
         return {
             "name": f"[{targeting['target_titles'][0]}]",
             "title": targeting["target_titles"][0],
             "email": "",
             "linkedin_url": "",
-            "source": "placeholder (--no-tavily)",
+            "source": "placeholder",
         }
 
     p("  ", f"Tavily fallback: searching for {targeting['target_titles'][0]} at {company_name}", quiet=True)

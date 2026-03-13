@@ -24,6 +24,10 @@ jobs:
             cd /opt/aline && git log --oneline -3 2>&1
             echo "=== email prompt check ==="
             grep -c "WHO WE ARE" /opt/aline/dry_run.py 2>&1 || echo "OLD PROMPT"
+            echo "=== prompt snippet ==="
+            grep -A 2 "PITCH LOGIC" /opt/aline/dry_run.py | head -5 2>&1
+            echo "=== bad patterns check ==="
+            grep -c "Getting this hire wrong\|Getting a senior regional leader wrong\|costs you two quarters" /opt/aline/dry_run.py 2>&1 || echo "0"
             echo "=== bot process start time ==="
             systemctl show slack_bot --property=ActiveEnterTimestamp 2>&1
             echo "=== last 80 lines ==="

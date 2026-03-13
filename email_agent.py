@@ -3,7 +3,7 @@ Aline Email Agent — Autonomous outreach for executive placement signals.
 
 Loads roles from Attio (sales_stage = ready_for_outreach), identifies the
 decision maker via Apollo/Tavily, generates a personalized cold email using
-Claude + soul.md/skill.md, and sends via Instantly API.
+Claude, and sends via Instantly API.
 """
 
 import os
@@ -306,60 +306,50 @@ def find_decision_maker(role: dict, company_domain: str) -> dict | None:
 
 # --- Email generation ---
 
-EMAIL_PROMPT = """{soul_md}
-{skill_md}
-
-Write a cold outreach email to {decision_maker_name}, {decision_maker_title} at {company_name}.
-
-Context:
-- We spotted this signal: {signal_type} — {signal_summary}
-- We're reaching out because we place Fractional/Interim {role_function} executives
-  into DACH startups. We're not recruiters. We're operators.
-- The role we see a fit for: {role_title}
-
-Rules:
-- Max 5 sentences in the body. No fluff.
-- Opening line must reference the specific signal (not generic).
-- No "I hope this finds you well". No "Dear Sir/Madam".
-- CTA: one clear question or ask. Never "let me know if you're interested."
-- Subject line: max 8 words, no clickbait.
-- Language: English unless company is clearly German-only (check domain/name).
-
-Return JSON:
-{{
-  "subject": "...",
-  "body": "...",
-  "reasoning": "why this angle for this signal type"
-}}"""
-
-
 def generate_email(role: dict, decision_maker: dict) -> dict | None:
-    """Generate a cold outreach email using Claude."""
-    with open(os.path.join(BASE_DIR, "soul.md")) as f:
-        soul_md = f.read()
-    with open(os.path.join(BASE_DIR, "skill.md")) as f:
-        skill_md = f.read()
-
+    """Generate a cold outreach email — short, human, no brand speak."""
     role_title = attio.extract_value(role, "name", "")
-    role_function = attio.extract_value(role, "role_function", "")
     company_name = attio.extract_value(role, "company_name", "")
-    signal_type = attio.extract_value(role, "signal_type", "")
     signal_summary = attio.extract_value(role, "signal_summary", "")
 
-    prompt = EMAIL_PROMPT.format(
-        soul_md=soul_md,
-        skill_md=skill_md,
-        decision_maker_name=decision_maker.get("name", ""),
-        decision_maker_title=decision_maker.get("title", ""),
-        company_name=company_name,
-        signal_type=signal_type,
-        signal_summary=signal_summary,
-        role_function=role_function,
-        role_title=role_title,
-    )
+    first_name = decision_maker.get("name", "").split()[0] if decision_maker.get("name") else "there"
+
+    prompt = f"""Write an outreach email from Niels (founder of Aline) to {first_name}.
+
+Context:
+- Role: {role_title} at {company_name}
+- Signal: {signal_summary}
+- Match the role level — never pitch up (e.g. don't offer a CTO for an engineer role)
+
+Here are 3 example emails. Vary your structure — don't copy one template:
+
+EXAMPLE A (fractional role, shortest):
+Hi Hannes, I came across the fractional legal counsel role. I think we have a few candidates who could be a good fit. We're Aline — a group of former Zalando and Deutsche Bank talent execs. We do interim, fractional, and executive hiring for scaling teams. Should we hop on a call this week? https://cal.com/niels-zanotto/30min Best, Niels
+
+EXAMPLE B (full-time role, mentions company):
+Hi Sarah, saw the Head of Engineering opening at Cometa. We work with DACH tech teams on senior hires like this — our team comes from Microsoft, Zalando, and Oda. I think we have some interesting profiles worth showing you. Happy to share them if useful — here's my calendar: https://cal.com/niels-zanotto/30min Best, Niels
+
+EXAMPLE C (short and direct):
+Hi Tom, the VP Sales role caught my eye. We help scaling companies fill exactly these kinds of roles. Our team comes from Zalando, Deutsche Bank, and Microsoft. Want to jump on a quick call? https://cal.com/niels-zanotto/30min Best, Niels
+
+HARD RULES — break any of these and the email is useless:
+1. Write like a human. No pseudo-analysis, no insight theater, no brand speak.
+2. "We" not "my team". Only claim where the team COMES FROM (Zalando, Deutsche Bank, Microsoft, Oda) — never what they "led" or "placed".
+3. Mention what the company does only if it fits naturally in one clause. Don't rephrase the JD.
+4. Match the role level — never pitch up.
+5. Under 100 words. End with casual CTA + https://cal.com/niels-zanotto/30min + "Best, Niels"
+
+Subject line: max 6 words, lowercase feel, no clickbait.
+
+Return JSON:
+{{{{
+  "subject": "...",
+  "body": "...",
+  "reasoning": "one sentence on the angle"
+}}}}"""
 
     response = call_claude(
-        system_prompt="You are Aline's email copywriter. Return only valid JSON.",
+        system_prompt="You are Niels writing a quick outreach email. Write like a normal person — not a copywriter, not a brand strategist. Return only valid JSON.",
         messages=[{"role": "user", "content": prompt}],
         max_tokens=1024,
     )

@@ -482,72 +482,61 @@ If not found, return {{"name": "", "title": "", "linkedin_url": "", "email": ""}
 # --- Step 5: Generate email ---
 
 def generate_email(jd: dict, company_info: dict, role_info: dict, dm: dict) -> dict:
-    """Generate outreach email using Claude + soul.md + skill.md."""
+    """Generate outreach email — short, human, no brand speak."""
     p("  ", "Generating email...", quiet=True)
 
-    with open(os.path.join(BASE_DIR, "soul.md")) as f:
-        soul_md = f.read()
-    with open(os.path.join(BASE_DIR, "skill.md")) as f:
-        skill_md = f.read()
+    first_name = dm.get("name", "").split()[0] if dm.get("name") else "there"
+    engagement = role_info.get("engagement_type", "Unknown")
+    one_liner = company_info.get("one_liner", "")
+    company = jd.get("company", "")
+    title = jd.get("title", "")
+
+    # Build pitch hint based on engagement type
+    if engagement in ("Fractional", "Interim"):
+        pitch_hint = f"This is a {engagement.lower()} role — pitch directly. We do exactly this."
+        pitch_type = "direct"
+    else:
+        pitch_hint = f"This is a full-time role. Offer a fractional/interim {title} as a bridge while they search for the permanent hire."
+        pitch_type = "bridge"
 
     try:
         response = claude.messages.create(
             model="claude-sonnet-4-5-20250929",
             max_tokens=1024,
-            system=f"""You are Niels, founder of Aline. You write your own outreach emails.
+            system="You are Niels writing a quick outreach email. Write like a normal person — not a copywriter, not a brand strategist. Return only valid JSON.",
+            messages=[{"role": "user", "content": f"""Write an outreach email from Niels (founder of Aline) to {first_name}.
 
-{soul_md}
-{skill_md}
+Context:
+- Role: {title} at {company}{f" — {one_liner}" if one_liner else ""}
+- {pitch_hint}
+- Match the role level — never pitch up (e.g. don't offer a CTO for an engineer role)
 
-CRITICAL: The instructions below OVERRIDE anything in soul.md/skill.md about email structure, CTAs, or tone. Follow THESE instructions.""",
-            messages=[{"role": "user", "content": f"""I need you to write a short outreach email. Here's everything I know:
+Here are 3 example emails. Vary your structure — don't copy one template:
 
-ABOUT THE COMPANY:
-{jd.get('company', '?')} — {company_info.get('one_liner', 'unknown')}
-Stage: {company_info.get('funding_stage', 'unknown')} | Size: ~{company_info.get('headcount', 'unknown')}
-Location: {jd.get('location', 'DACH')}
+EXAMPLE A (fractional role, shortest):
+Hi Hannes, I came across the fractional legal counsel role. I think we have a few candidates who could be a good fit. We're Aline — a group of former Zalando and Deutsche Bank talent execs. We do interim, fractional, and executive hiring for scaling teams. Should we hop on a call this week? https://cal.com/niels-zanotto/30min Best, Niels
 
-THE ROLE THEY'RE HIRING:
-{jd.get('title', '?')} ({role_info.get('engagement_type', 'Unknown')})
-Signal: {role_info.get('signal_type', '')}
-Agency involved: {role_info.get('uses_agency', False)}
+EXAMPLE B (full-time role, mentions company):
+Hi Sarah, saw the Head of Engineering opening at Cometa. We work with DACH tech teams on senior hires like this — our team comes from Microsoft, Zalando, and Oda. I think we have some interesting profiles worth showing you. Happy to share them if useful — here's my calendar: https://cal.com/niels-zanotto/30min Best, Niels
 
-JOB DESCRIPTION:
-{jd.get('description', '')[:2000]}
+EXAMPLE C (short and direct):
+Hi Tom, the VP Sales role caught my eye. We help scaling companies fill exactly these kinds of roles. Our team comes from Zalando, Deutsche Bank, and Microsoft. Want to jump on a quick call? https://cal.com/niels-zanotto/30min Best, Niels
 
-SENDING TO: {dm.get('name', 'the decision maker')}, {dm.get('title', '')}
+HARD RULES — break any of these and the email is useless:
+1. Write like a human. No pseudo-analysis, no insight theater, no brand speak.
+2. "We" not "my team". Only claim where the team COMES FROM (Zalando, Deutsche Bank, Microsoft, Oda) — never what they "led" or "placed".
+3. Mention what the company does only if it fits naturally in one clause. Don't rephrase the JD.
+4. Match the role level — never pitch up.
+5. Under 100 words. End with casual CTA + https://cal.com/niels-zanotto/30min + "Best, Niels"
 
----
-
-Now think about this situation. What's interesting about this company? What are they building? Why is this role open? What would make {dm.get('name', 'them').split()[0] if dm.get('name') else 'them'} want to reply?
-
-Write the email as ME (Niels). I'm a former talent exec. My team at Aline comes from Zalando, Microsoft, Deutsche Bank, Oda. We do interim, fractional and executive hiring for scaling companies.
-
-IMPORTANT — how to write this:
-- Write like I'm sending a quick email to a peer. Casual, confident, human.
-- 4-6 sentences max. Keep it under 100 words.
-- Show I know what their company does — but naturally, in passing, not as a display.
-- Don't follow a formula. Each email should feel like I actually sat down and thought about this specific company. Vary the structure, the opening, the flow.
-- If it's a full-time role: say I think we have some candidates who could fit and suggest a call.
-- If it's fractional/interim: pitch directly, we do exactly this.
-- Match the role level. If they hire a Senior Engineer, talk about senior engineers — NEVER jump to CTO/VP.
-- End with something casual like "Should we jump on a call?" or "Happy to send over some profiles." Then: https://cal.com/niels-zanotto/30min and "Best, Niels"
-- Subject: max 6 words, casual
-
-NEVER DO THESE:
-- "Getting this hire wrong costs you..." — I don't tell people what their problems are
-- "We place fractional X executives who have built Y before — they can own Z" — too specific, too salesy
-- "Our partners have led [function] at [company]" — I say where my team COMES FROM, not what they "led"
-- "Is the search already underway?" or "Do you have coverage?" — diagnostic questions are weird from a stranger
-- Any rigid hook→intro→bridge→proof→CTA structure — real emails don't follow templates
-- "I saw you're hiring X" as an opener
+Subject line: max 6 words, lowercase feel, no clickbait.
 
 Return JSON:
 {{
   "subject": "...",
   "body": "...",
-  "pitch_type": "bridge" or "direct",
-  "reasoning": "why this angle for this signal type"
+  "pitch_type": "{pitch_type}",
+  "reasoning": "one sentence on the angle"
 }}"""}],
         )
         for block in response.content:

@@ -51,8 +51,9 @@ JD_URL_PATTERN = re.compile(
 
 app = App(token=SLACK_BOT_TOKEN)
 
-# Track processed message timestamps to avoid duplicates (thread-safe)
-_processed_ts = set()
+# Track processed URLs per channel to avoid duplicates (thread-safe)
+# Key: (channel, url) — survives message_changed events better than ts-based dedup
+_processed_urls = set()
 _processed_lock = threading.Lock()
 
 
@@ -151,15 +152,6 @@ def handle_message(event, say):
     channel = event.get("channel", "")
     log.info(f"Message received: subtype={subtype} text={text[:200]}")
 
-    # Dedup: skip if we already processed this message (thread-safe)
-    with _processed_lock:
-        if ts in _processed_ts:
-            log.info(f"Skipping duplicate ts={ts}")
-            return
-        _processed_ts.add(ts)
-        if len(_processed_ts) > 1000:
-            _processed_ts.clear()
-
     # Slack wraps URLs like <https://...|label> or <https://...>
     slack_urls = re.findall(r"<(https?://[^|>]+)(?:\|[^>]*)?>", text)
     # Clean Slack's HTML encoding and strip fragments
@@ -173,8 +165,22 @@ def handle_message(event, say):
     if not urls:
         return
 
-    # Deduplicate
+    # Deduplicate within message
     urls = list(dict.fromkeys(urls))
+
+    # Dedup: skip URLs we already processed in this channel (thread-safe)
+    with _processed_lock:
+        new_urls = [u for u in urls if (channel, u) not in _processed_urls]
+        for u in new_urls:
+            _processed_urls.add((channel, u))
+        if len(_processed_urls) > 1000:
+            _processed_urls.clear()
+
+    if not new_urls:
+        log.info(f"Skipping duplicate URLs: {urls}")
+        return
+
+    urls = new_urls
 
     for url in urls:
         log.info(f"Processing JD URL: {url}")

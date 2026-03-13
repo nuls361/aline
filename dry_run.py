@@ -368,7 +368,7 @@ Return JSON:
 
     try:
         resp = tavily.search(
-            query=f"{company_name} {targeting['target_titles'][0]} LinkedIn",
+            query=f'"{company_name}" {targeting["target_titles"][0]} site:linkedin.com/in',
             max_results=3,
         )
         results = resp.get("results", [])
@@ -381,7 +381,9 @@ Return JSON:
                 model="claude-sonnet-4-5-20250929",
                 max_tokens=256,
                 system="Extract person info. Return only valid JSON.",
-                messages=[{"role": "user", "content": f"""From these search results, extract the {targeting['target_titles'][0]} of {company_name}:
+                messages=[{"role": "user", "content": f"""From these search results, extract the {targeting['target_titles'][0]} of {company_name}.
+
+CRITICAL: The person MUST actually work at {company_name}. Do NOT return people who work at other companies. If none of the results contain someone who works at {company_name}, return empty fields.
 
 {context}
 
@@ -429,15 +431,14 @@ def generate_email(jd: dict, company_info: dict, role_info: dict, dm: dict) -> d
 
 Write a cold outreach email to {dm.get('name', 'the decision maker')}, {dm.get('title', '')} at {jd.get('company', '')}.
 
-ENRICHMENT CONTEXT (use this — we did the research):
-- Signal spotted: {role_info.get('signal_type', '')}
-- Role: {jd.get('title', '')} ({role_info.get('engagement_type', 'Unknown')} position)
+ENRICHMENT CONTEXT (you MUST use this to show you know the company):
 - Company: {jd.get('company', '')} — {company_info.get('one_liner', 'unknown')}
 - Stage: {company_info.get('funding_stage', 'unknown')} | Size: ~{company_info.get('headcount', 'unknown')}
-- Domain: {company_info.get('domain', 'unknown')}
+- Role: {jd.get('title', '')} ({role_info.get('engagement_type', 'Unknown')} position)
+- Signal: {role_info.get('signal_type', '')}
 - Location: {jd.get('location', 'DACH')}
 
-JOB DESCRIPTION (use specific details from this for the context hook):
+JOB DESCRIPTION (read this carefully — reference what the company DOES or what the role involves, in natural language):
 {jd.get('description', '')[:2000]}
 
 WHO WE ARE (weave this in naturally, don't copy-paste):

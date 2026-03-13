@@ -324,20 +324,21 @@ Context:
 Here are 3 example emails. Vary your structure — don't copy one template:
 
 EXAMPLE A (fractional role, shortest):
-Hi Hannes, I came across the fractional legal counsel role. I think we have a few candidates who could be a good fit. We're Aline — a group of former Zalando and Deutsche Bank talent execs. We do interim, fractional, and executive hiring for scaling teams. Should we hop on a call this week? https://cal.com/niels-zanotto/30min Best, Niels
+Hi Hannes, I came across the fractional legal counsel role. I think we have a few candidates who could be a good fit. We're Aline — an AI-driven search firm built by former Zalando and Deutsche Bank talent execs. We do interim, fractional, and executive hiring for scaling teams. Should we hop on a call this week? https://cal.com/niels-zanotto/30min Best, Niels
 
 EXAMPLE B (full-time role, mentions company):
-Hi Sarah, saw the Head of Engineering opening at Cometa. We work with DACH tech teams on senior hires like this — our team comes from Microsoft, Zalando, and Oda. I think we have some interesting profiles worth showing you. Happy to share them if useful — here's my calendar: https://cal.com/niels-zanotto/30min Best, Niels
+Hi Sarah, saw the Head of Engineering opening at Cometa. We're Aline — an AI-driven search firm founded by former Microsoft, Zalando, and Oda talent execs. We work with DACH tech teams on senior hires like this. I think we have some interesting profiles worth showing you. Happy to share them if useful — here's my calendar: https://cal.com/niels-zanotto/30min Best, Niels
 
 EXAMPLE C (short and direct):
-Hi Tom, the VP Sales role caught my eye. We help scaling companies fill exactly these kinds of roles. Our team comes from Zalando, Deutsche Bank, and Microsoft. Want to jump on a quick call? https://cal.com/niels-zanotto/30min Best, Niels
+Hi Tom, the VP Sales role caught my eye. We're Aline — an AI-driven search firm built by former Zalando, Deutsche Bank, and Microsoft talent execs. We help scaling companies fill exactly these kinds of roles. Want to jump on a quick call? https://cal.com/niels-zanotto/30min Best, Niels
 
 HARD RULES — break any of these and the email is useless:
 1. Write like a human. No pseudo-analysis, no insight theater, no brand speak.
-2. "We" not "my team". Only claim where the team COMES FROM (Zalando, Deutsche Bank, Microsoft, Oda) — never what they "led" or "placed".
-3. Mention what the company does only if it fits naturally in one clause. Don't rephrase the JD.
-4. Match the role level — never pitch up.
-5. Under 100 words. End with casual CTA + https://cal.com/niels-zanotto/30min + "Best, Niels"
+2. Always introduce Aline by name: "We're Aline — former [companies] talent execs." Never skip the name.
+3. "We" not "my team". Only claim where the team COMES FROM (Zalando, Deutsche Bank, Microsoft, Oda) — never what they "led" or "placed".
+4. Mention what the company does only if it fits naturally in one clause. Don't rephrase the JD.
+5. Match the role level — never pitch up.
+6. Under 100 words. End with casual CTA + https://cal.com/niels-zanotto/30min + "Best, Niels"
 
 Subject line: max 6 words, lowercase feel, no clickbait.
 

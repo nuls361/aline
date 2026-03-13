@@ -496,8 +496,8 @@ def generate_email(jd: dict, company_info: dict, role_info: dict, dm: dict) -> d
         pitch_hint = f"This is a {engagement.lower()} role — pitch directly. We do exactly this."
         pitch_type = "direct"
     else:
-        pitch_hint = f"This is a full-time role. Offer a fractional/interim {title} as a bridge while they search for the permanent hire."
-        pitch_type = "bridge"
+        pitch_hint = "This is a full-time role. Just offer to help fill the role — say we have candidates or profiles. Do NOT mention fractional, interim, or bridge. Save that for the call."
+        pitch_type = "direct"
 
     try:
         response = claude.messages.create(
@@ -516,8 +516,8 @@ Here are 3 example emails. Vary your structure — don't copy one template:
 EXAMPLE A (fractional role, shortest):
 Hi Hannes, I came across the fractional legal counsel role. I think we have a few candidates who could be a good fit. We're Aline — an AI-driven search firm built by former Zalando and Deutsche Bank talent execs. We do interim, fractional, and executive hiring for scaling teams. Should we hop on a call this week? https://cal.com/niels-zanotto/30min Best, Niels
 
-EXAMPLE B (full-time role, mentions company):
-Hi Sarah, saw the Head of Engineering opening at Cometa. We're Aline — an AI-driven search firm founded by former Microsoft, Zalando, and Oda talent execs. We work with DACH tech teams on senior hires like this. I think we have some interesting profiles worth showing you. Happy to share them if useful — here's my calendar: https://cal.com/niels-zanotto/30min Best, Niels
+EXAMPLE B (full-time role, just offer to help):
+Hi Sarah, saw the Head of Engineering opening at Cometa. We're Aline — an AI-driven search firm founded by former Microsoft, Zalando, and Oda talent execs. We work with DACH tech teams on senior hires like this and I think we have some interesting profiles worth showing you. Happy to share them if useful — here's my calendar: https://cal.com/niels-zanotto/30min Best, Niels
 
 EXAMPLE C (short and direct):
 Hi Tom, the VP Sales role caught my eye. We're Aline — an AI-driven search firm built by former Zalando, Deutsche Bank, and Microsoft talent execs. We help scaling companies fill exactly these kinds of roles. Want to jump on a quick call? https://cal.com/niels-zanotto/30min Best, Niels
@@ -528,7 +528,8 @@ HARD RULES — break any of these and the email is useless:
 3. "We" not "my team". Only claim where the team COMES FROM (Zalando, Deutsche Bank, Microsoft, Oda) — never what they "led" or "placed".
 4. Mention what the company does only if it fits naturally in one clause. Don't rephrase the JD.
 5. Match the role level — never pitch up.
-6. Under 100 words. End with casual CTA + https://cal.com/niels-zanotto/30min + "Best, Niels"
+6. For full-time roles: just offer to help fill the role. Do NOT mention fractional, interim, or bridge — save that for the call.
+7. Under 100 words. End with casual CTA + https://cal.com/niels-zanotto/30min + "Best, Niels"
 
 Subject line: max 6 words, lowercase feel, no clickbait.
 
